@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { apiCall } from "./utils/api";
 
 function Login() {
   const navigate = useNavigate();
@@ -31,15 +32,14 @@ function Login() {
     }
   }, [navigate]);
 
-  const handleLogin = async (e) => {
+const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError("");
 
     try {
-      const response = await fetch("http://127.0.0.1:5000/api/auth/login", {
+      const response = await apiCall("/auth/login", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
       });
 
@@ -66,13 +66,12 @@ function Login() {
     }
   };
 
-  const handlePasswordReset = async (e) => {
+const handlePasswordReset = async (e) => {
     e.preventDefault();
     setResetMessage("Sending...");
     try {
-      const res = await fetch("http://127.0.0.1:5000/api/auth/password-reset/request", {
+      const res = await apiCall("/auth/password-reset/request", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email: resetEmail }),
       });
       const data = await res.json();
