@@ -36,16 +36,17 @@ const EmployeeDashboard = () => {
   const [salaryStructure, setSalaryStructure] = useState(null);
 
   useEffect(() => {
+    if (!user?.id) { setLoading(false); return; }
     const fetchAll = async () => {
       try {
-        const [profileRes, taskRes, attRes, leaveRes, metalRes] = await Promise.all([
+        const [profileRes, taskRes, attRes, leaveRes, metalRes] = await Promise.allSettled([
           apiCall(`/profiles/${user.id}`),
           apiCall("/tasks/"),
           apiCall("/attendance/today"),
           apiCall("/leaves/balance"),
           apiCall("/metals/prices"),
         ]);
-        const [profileData, taskData, attData, leaveData, metalData] = await Promise.all([
+        const [profileData, taskData, attData, leaveData, metalData] = await Promise.allSettled([
           profileRes.json(), taskRes.json(), attRes.json(), leaveRes.json(), metalRes.json(),
         ]);
         if (profileData.status === "success") setProfile(profileData.data);
@@ -61,7 +62,7 @@ const EmployeeDashboard = () => {
     };
     fetchAll();
     fetchLeaveTypes();
-  }, [user.id]);
+  }, [user?.id]);
 
   const fetchLeaveTypes = async () => {
     try {

@@ -15,10 +15,16 @@ export async function apiCall(endpoint, options = {}) {
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  let response = await fetch(`${API_BASE}${endpoint}`, {
-    ...options,
-    headers,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      headers,
+    });
+  } catch (fetchError) {
+    console.error(`API call failed: ${endpoint}`, fetchError);
+    throw new Error(`Cannot connect to server. Backend may be down.`);
+  }
 
   // Auto-refresh on 401
   if (response.status === 401 && !endpoint.includes("/auth/login")) {

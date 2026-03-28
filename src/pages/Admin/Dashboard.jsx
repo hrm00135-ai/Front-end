@@ -20,14 +20,14 @@ const Dashboard = () => {
   useEffect(() => {
     const fetchAll = async () => {
       try {
-        const [dashRes, empRes, metalRes, taskRes, leaveRes] = await Promise.all([
+        const [dashRes, empRes, metalRes, taskRes, leaveRes] = await Promise.allSettled([
           apiCall("/reports/dashboard"),
           apiCall("/users/?per_page=100"),
           apiCall("/metals/prices"),
           apiCall("/tasks/?per_page=100"),
           apiCall("/leaves/pending"),
         ]);
-        const [dashData, empData, metalData, taskData, leaveData] = await Promise.all([
+        const [dashData, empData, metalData, taskData, leaveData] = await Promise.allSettled([
           dashRes.json(), empRes.json(), metalRes.json(), taskRes.json(), leaveRes.json(),
         ]);
         if (dashData.status === "success") setStats(dashData.data);
@@ -47,12 +47,12 @@ const Dashboard = () => {
   const fetchEmpDetails = async (empId) => {
     if (empDetails[empId]) return;
     try {
-      const [profileRes, bankRes, docsRes] = await Promise.all([
+      const [profileRes, bankRes, docsRes] = await Promise.allSettled([
         apiCall(`/profiles/${empId}`),
         apiCall(`/profiles/${empId}/bank`),
         apiCall(`/profiles/${empId}/documents`),
       ]);
-      const [profile, bank, docs] = await Promise.all([
+      const [profile, bank, docs] = await Promise.allSettled([
         profileRes.json(), bankRes.json(), docsRes.json(),
       ]);
       setEmpDetails(prev => ({

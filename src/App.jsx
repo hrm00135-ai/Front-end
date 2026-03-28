@@ -12,6 +12,8 @@ import MetalPrices from "./pages/Admin/MetalPrices";
 import Reports from "./pages/Admin/Reports";
 import PasswordResets from "./pages/Admin/PasswordResets";
 import SystemLogs from "./pages/Admin/SystemLogs";
+import ErrorBoundary from "./components/ErrorBoundary";
+
 
 function ProtectedRoute({ children, allowedRoles }) {
   const token = localStorage.getItem("access_token");
@@ -35,6 +37,7 @@ function ProtectedRoute({ children, allowedRoles }) {
 
 function App() {
   return (
+    <ErrorBoundary>
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Login />} />
@@ -113,6 +116,7 @@ function App() {
 
       </Routes>
     </BrowserRouter>
+    </ErrorBoundary>
   );
 }
 
