@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import { apiCall } from "../../utils/api";
+import Layout from "../../components/Layout";
 
 const EmployeeTasks = () => {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [uploadingFor, setUploadingFor] = useState(null);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [submitting, setSubmitting] = useState(null);
 
   useEffect(() => {
     fetchTasks();
@@ -15,135 +19,259 @@ const EmployeeTasks = () => {
       setLoading(true);
       setError("");
 
-      const res = await apiCall("/tasks/my-tasks");
+      const res = await apiCall("/tasks/");
       const data = await res.json();
 
-      console.log("TASK API RESPONSE:", data);
-
       if (data.status === "success") {
-        setTasks(data.data || []);
+        setTasks(data.data?.tasks || data.data || []);
       } else {
-        setTasks([]); // fallback
+        setTasks([]);
       }
     } catch (err) {
       console.error(err);
-      setTasks([]); // prevent crash
-      setError("");
+      setTasks([]);
+      setError("Failed to load tasks");
     } finally {
       setLoading(false);
     }
   };
 
-  const updateStatus = async (id, status) => {
+  const startTask = async (id) => {
     try {
-      await apiCall(`/tasks/${id}/update`, {
+      await apiCall(`/tasks/${id}`, {
         method: "PUT",
-        body: JSON.stringify({ status }),
+        body: JSON.stringify({ status: "in_progress" }),
       });
       fetchTasks();
     } catch (err) {
-      console.error("Update failed:", err);
+      console.error("Start failed:", err);
     }
   };
 
-  // 🎨 Status badge styles
-  const getStatusStyle = (status) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-700";
-      case "in_progress":
-        return "bg-blue-100 text-blue-700";
-      case "completed":
-        return "bg-green-100 text-green-700";
-      case "on_hold":
-        return "bg-gray-200 text-gray-700";
-      default:
-        return "bg-gray-100 text-gray-600";
+  const submitForReview = async (id) => {
+    setSubmitting(id);
+    try {
+      // Log each uploaded image as a comment
+      for (const file of selectedFiles) {
+        await apiCall(`/tasks/${id}/comments`, {
+          method: "POST",
+          body: JSON.stringify({ comment: `📸 Image submitted: ${file.name}` }),
+        });
+      }
+
+      // Move task to review (on_hold = review column in admin Kanban)
+      await apiCall(`/tasks/${id}`, {
+        method: "PUT",
+        body: JSON.stringify({ status: "on_hold" }),
+      });
+
+      setSelectedFiles([]);
+      setUploadingFor(null);
+      fetchTasks();
+    } catch (err) {
+      console.error("Submit for review failed:", err);
+    } finally {
+      setSubmitting(null);
     }
+  };
+
+  const prioColor = (p) => {
+    const c = { low: "#6b7280", medium: "#3b82f6", high: "#ea580c", urgent: "#dc2626" };
+    return c[p] || "#6b7280";
   };
 
   return (
-    <div className="p-4 w-full">
-      {/* 🔹 Header */}
-      <h1 className="text-xl sm:text-2xl font-bold mb-4">My Tasks</h1>
+    <Layout>
+      <div style={{ padding: "16px", width: "100%" }}>
+        <h1 style={{ fontSize: "22px", fontWeight: "bold", marginBottom: "20px" }}>My Tasks</h1>
 
-      {/* 🔄 Loading */}
-      {loading && (
-        <p className="text-gray-500 text-center">Loading tasks...</p>
-      )}
+        {/* Loading */}
+        {loading && (
+          <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>Loading tasks...</div>
+        )}
 
-      {/* ❌ Error */}
-      {!loading && error && (
-        <p className="text-red-500 text-center">{error}</p>
-      )}
+        {/* Error */}
+        {!loading && error && (
+          <div style={{ background: "#fee2e2", color: "#dc2626", padding: "12px", borderRadius: "8px", marginBottom: "16px", fontSize: "14px" }}>{error}</div>
+        )}
 
-      {/* 📭 Empty State */}
-      {!loading && tasks.length === 0 && (
-        <div className="text-center text-gray-500 mt-10">
-          <p className="text-lg">No tasks assigned</p>
-          <p className="text-sm">You’re all caught up 🎉</p>
-        </div>
-      )}
+        {/* Empty */}
+        {!loading && !error && tasks.length === 0 && (
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "#94a3b8" }}>
+            <div style={{ fontSize: "40px", marginBottom: "12px" }}>📋</div>
+            <p style={{ fontSize: "18px", fontWeight: "600", color: "#64748b" }}>No tasks assigned</p>
+            <p style={{ fontSize: "14px", marginTop: "4px" }}>You're all caught up</p>
+          </div>
+        )}
 
-      {/* ✅ Task Grid */}
-      {!loading && tasks.length > 0 && (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {tasks.map((task) => (
-            <div
-              key={task.id}
-              className="bg-white rounded-xl shadow-sm border p-4 flex flex-col justify-between hover:shadow-md transition"
-            >
-              {/* 🔹 Top */}
-              <div>
-                <h3 className="font-semibold text-lg">
-                  {task.title}
-                </h3>
+        {/* Task Grid */}
+        {!loading && tasks.length > 0 && (
+          <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
+            {tasks.map((task) => (
+              <div
+                key={task.id}
+                style={{
+                  background: "white",
+                  borderRadius: "12px",
+                  border: "1px solid #e2e8f0",
+                  padding: "20px",
+                  display: "flex",
+                  flexDirection: "column",
+                  justifyContent: "space-between",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+                }}
+              >
+                {/* Task Info */}
+                <div>
+                  <h3 style={{ fontSize: "17px", fontWeight: "700", color: "#1e293b", marginBottom: "6px" }}>
+                    {task.title}
+                  </h3>
 
-                <p className="text-sm text-gray-600 mt-1">
-                  {task.description || "No description"}
-                </p>
-
-                {/* 🔹 Info */}
-                <div className="mt-3 space-y-1 text-sm">
-                  <p>
-                    <span className="font-medium">Priority:</span>{" "}
-                    {task.priority}
+                  <p style={{ fontSize: "13px", color: "#64748b", lineHeight: "1.4", marginBottom: "12px" }}>
+                    {task.description || "No description"}
                   </p>
 
-                  <p>
-                    <span className="font-medium">Due:</span>{" "}
-                    {task.due_date || "No deadline"}
-                  </p>
+                  {/* Meta */}
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
+                    {task.category && (
+                      <span style={{ background: "#f1f5f9", padding: "3px 10px", borderRadius: "6px", fontSize: "12px", color: "#475569" }}>
+                        {task.category}
+                      </span>
+                    )}
+                    <span style={{ background: `${prioColor(task.priority)}15`, color: prioColor(task.priority), padding: "3px 10px", borderRadius: "6px", fontSize: "12px", fontWeight: "600" }}>
+                      {task.priority}
+                    </span>
+                    {task.due_date && (
+                      <span style={{ background: "#f1f5f9", padding: "3px 10px", borderRadius: "6px", fontSize: "12px", color: "#475569" }}>
+                        Due: {task.due_date}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Status Badge */}
+                  <span style={{
+                    display: "inline-block",
+                    padding: "4px 12px",
+                    borderRadius: "20px",
+                    fontSize: "12px",
+                    fontWeight: "600",
+                    background: task.status === "pending" ? "#fef3c7" : task.status === "in_progress" ? "#dbeafe" : task.status === "on_hold" ? "#fef9c3" : task.status === "completed" ? "#dcfce7" : "#f1f5f9",
+                    color: task.status === "pending" ? "#d97706" : task.status === "in_progress" ? "#2563eb" : task.status === "on_hold" ? "#a16207" : task.status === "completed" ? "#16a34a" : "#64748b",
+                  }}>
+                    {task.status === "pending" && "📌 Assigned"}
+                    {task.status === "in_progress" && "🔧 In Progress"}
+                    {task.status === "on_hold" && "👀 Under Review"}
+                    {task.status === "completed" && "✅ Completed"}
+                  </span>
                 </div>
 
-                {/* 🔹 Status Badge */}
-                <span
-                  className={`inline-block mt-2 px-2 py-1 text-xs rounded-full ${getStatusStyle(
-                    task.status
-                  )}`}
-                >
-                  {task.status}
-                </span>
-              </div>
+                {/* === WORKFLOW ACTIONS === */}
+                <div style={{ marginTop: "16px" }}>
 
-              {/* 🔹 Action */}
-              <select
-                value={task.status}
-                onChange={(e) =>
-                  updateStatus(task.id, e.target.value)
-                }
-                className="border px-2 py-1 mt-4 rounded w-full text-sm"
-              >
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="on_hold">On Hold</option>
-              </select>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+                  {/* PENDING → Start button */}
+                  {task.status === "pending" && (
+                    <button
+                      onClick={() => startTask(task.id)}
+                      style={{
+                        width: "100%", padding: "12px", borderRadius: "8px", border: "none",
+                        cursor: "pointer", fontWeight: "600", fontSize: "14px",
+                        background: "#3b82f6", color: "white",
+                      }}
+                    >
+                      ▶ Start Task
+                    </button>
+                  )}
+
+                  {/* IN PROGRESS → Upload & submit for review */}
+                  {task.status === "in_progress" && (
+                    <div>
+                      {uploadingFor !== task.id ? (
+                        <button
+                          onClick={() => setUploadingFor(task.id)}
+                          style={{
+                            width: "100%", padding: "12px", borderRadius: "8px",
+                            border: "2px dashed #cbd5e1", cursor: "pointer",
+                            fontWeight: "600", fontSize: "14px",
+                            background: "white", color: "#475569",
+                          }}
+                        >
+                          📸 Upload Images & Submit for Review
+                        </button>
+                      ) : (
+                        <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", padding: "14px", background: "#f8fafc" }}>
+                          <p style={{ fontSize: "13px", fontWeight: "600", color: "#475569", marginBottom: "8px" }}>
+                            Upload task images
+                          </p>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={(e) => setSelectedFiles([...e.target.files])}
+                            style={{ fontSize: "13px", marginBottom: "10px", width: "100%" }}
+                          />
+                          {selectedFiles.length > 0 && (
+                            <p style={{ fontSize: "12px", color: "#16a34a", marginBottom: "10px" }}>
+                              ✓ {selectedFiles.length} file(s) selected
+                            </p>
+                          )}
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            <button
+                              onClick={() => submitForReview(task.id)}
+                              disabled={selectedFiles.length === 0 || submitting === task.id}
+                              style={{
+                                flex: 1, padding: "10px", borderRadius: "6px", border: "none",
+                                cursor: selectedFiles.length === 0 ? "not-allowed" : "pointer",
+                                fontWeight: "600", fontSize: "13px",
+                                background: selectedFiles.length === 0 ? "#e2e8f0" : "#16a34a",
+                                color: selectedFiles.length === 0 ? "#94a3b8" : "white",
+                                opacity: submitting === task.id ? 0.6 : 1,
+                              }}
+                            >
+                              {submitting === task.id ? "Submitting..." : "✓ Submit for Review"}
+                            </button>
+                            <button
+                              onClick={() => { setUploadingFor(null); setSelectedFiles([]); }}
+                              style={{
+                                padding: "10px 14px", borderRadius: "6px",
+                                border: "1px solid #cbd5e1", cursor: "pointer",
+                                fontSize: "13px", background: "white", color: "#64748b",
+                              }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ON HOLD (REVIEW) → Waiting message */}
+                  {task.status === "on_hold" && (
+                    <div style={{
+                      background: "#fef3c7", color: "#92400e", padding: "12px",
+                      borderRadius: "8px", textAlign: "center", fontSize: "13px", fontWeight: "600",
+                    }}>
+                      ⏳ Submitted for review — Waiting for admin approval
+                    </div>
+                  )}
+
+                  {/* COMPLETED → Done */}
+                  {task.status === "completed" && (
+                    <div style={{
+                      background: "#dcfce7", color: "#166534", padding: "12px",
+                      borderRadius: "8px", textAlign: "center", fontSize: "13px", fontWeight: "600",
+                    }}>
+                      ✅ Task completed — Approved by admin
+                    </div>
+                  )}
+
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </Layout>
   );
 };
 

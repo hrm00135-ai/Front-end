@@ -60,7 +60,7 @@ const Sidebar = () => {
 
             <span style={sectionLabel("Work")}>Work</span>
             <li><Link to="/admin/assign-task" style={linkStyle("/admin/assign-task")}>Assign Tasks</Link></li>
-            <li><Link to="/admin/tasks" style={linkStyle("/admin/tasks")}>All Tasks</Link></li>
+            <li><Link to="/admin/assign-task" style={linkStyle("/admin/assign-task")}>All Tasks</Link></li>
             <li><Link to="/admin/attendance" style={linkStyle("/admin/attendance")}>Attendance</Link></li>
             <li><Link to="/admin/leaves" style={linkStyle("/admin/leaves")}>Leaves</Link></li>
 

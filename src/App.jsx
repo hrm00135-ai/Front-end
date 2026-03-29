@@ -13,6 +13,11 @@ import Reports from "./pages/Admin/Reports";
 import PasswordResets from "./pages/Admin/PasswordResets";
 import SystemLogs from "./pages/Admin/SystemLogs";
 import ErrorBoundary from "./components/ErrorBoundary";
+import EmployeeTasks from "./pages/Employee/EmployeeTasks";
+import EmployeeAttendance from "./pages/Employee/Attendance";
+import EmployeeLeaves from "./pages/Employee/Leaves";
+import EmployeeDocuments from "./pages/Employee/Documents";
+import EmployeeProfilePage from "./pages/Employee/Profile";
 
 
 function ProtectedRoute({ children, allowedRoles }) {
@@ -113,6 +118,38 @@ function App() {
             <EmployeeDashboard />
           </ProtectedRoute>
         } />
+
+
+        <Route path="/employee/tasks" element={
+          <ProtectedRoute allowedRoles={["employee"]}>
+            <EmployeeTasks />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/employee/attendance" element={
+          <ProtectedRoute allowedRoles={["employee"]}>
+            <EmployeeAttendance />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/employee/leaves" element={
+          <ProtectedRoute allowedRoles={["employee"]}>
+            <EmployeeLeaves />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/employee/documents" element={
+          <ProtectedRoute allowedRoles={["employee"]}>
+            <EmployeeDocuments />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/employee/profile" element={
+          <ProtectedRoute allowedRoles={["employee"]}>
+            <EmployeeProfilePage />
+          </ProtectedRoute>
+        } />
+
 
       </Routes>
     </BrowserRouter>
