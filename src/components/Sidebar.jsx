@@ -29,25 +29,8 @@ const Sidebar = () => {
   });
 
   return (
-    <div
-      style={{
-        width: "220px",
-        minWidth: "220px",
-        background: "#1e293b",
-        color: "white",
-        padding: "16px 12px",
-        overflowY: "auto",
-      }}
-    >
-      <h2
-        style={{
-          fontSize: "16px",
-          fontWeight: "700",
-          padding: "0 12px 8px",
-          borderBottom: "1px solid #334155",
-          marginBottom: "8px",
-        }}
-      >
+    <div style={{ width: "220px", minWidth: "220px", background: "#1e293b", color: "white", padding: "16px 12px", overflowY: "auto" }}>
+      <h2 style={{ fontSize: "16px", fontWeight: "700", padding: "0 12px 8px", borderBottom: "1px solid #334155", marginBottom: "8px" }}>
         {isAdmin ? "Admin Panel" : "Employee Panel"}
       </h2>
 
@@ -60,7 +43,6 @@ const Sidebar = () => {
 
             <span style={sectionLabel("Work")}>Work</span>
             <li><Link to="/admin/assign-task" style={linkStyle("/admin/assign-task")}>Assign Tasks</Link></li>
-            <li><Link to="/admin/assign-task" style={linkStyle("/admin/assign-task")}>All Tasks</Link></li>
             <li><Link to="/admin/attendance" style={linkStyle("/admin/attendance")}>Attendance</Link></li>
             <li><Link to="/admin/leaves" style={linkStyle("/admin/leaves")}>Leaves</Link></li>
 
@@ -69,9 +51,9 @@ const Sidebar = () => {
             <li><Link to="/admin/metals" style={linkStyle("/admin/metals")}>Metal Prices</Link></li>
 
             <span style={sectionLabel("Admin")}>Admin</span>
+            <li><Link to="/admin/login-activity" style={linkStyle("/admin/login-activity")}>Login Activity</Link></li>
             <li><Link to="/admin/reports" style={linkStyle("/admin/reports")}>Reports</Link></li>
             <li><Link to="/admin/password-resets" style={linkStyle("/admin/password-resets")}>Password Resets</Link></li>
-
             {isSuperAdmin && (
               <li><Link to="/admin/system-logs" style={linkStyle("/admin/system-logs")}>System Logs</Link></li>
             )}

@@ -59,8 +59,8 @@ const Layout = ({ children, topBar }) => {
 
         {/* Right Section */}
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px" }}>
-          
-          {/* Top Bar (Metal Bar FIXED spacing) */}
+
+          {/* Top Bar */}
           {topBar && (
             <div
               style={{
