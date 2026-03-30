@@ -64,19 +64,18 @@ const Navbar = () => {
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   // ── fetch notifications ──
-  const fetchNotifications = async () => {
-    try {
-      // TODO: swap mock for real API when backend is ready:
-      // const res  = await apiCall("/notifications");
-      // const data = await res.json();
-      // if (data.status === "success") setNotifications(data.data || []);
+const fetchNotifications = async () => {
+  try {
+    const res = await apiCall("/notifications");
+    const data = await res.json();
 
-      // MOCK (remove when backend is ready):
-      setNotifications(MOCK_NOTIFICATIONS);
-    } catch (err) {
-      console.error("Failed to fetch notifications:", err);
+    if (data.status === "success") {
+      setNotifications(data.data || []);
     }
-  };
+  } catch (err) {
+    console.error("Failed to fetch notifications:", err);
+  }
+};
 
   useEffect(() => {
     fetchNotifications();
