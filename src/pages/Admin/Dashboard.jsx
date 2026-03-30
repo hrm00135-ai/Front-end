@@ -4,15 +4,6 @@ import Layout from "../../components/Layout";
 import { apiCall, getUser, BASE_URL } from "../../utils/api";
 import AdminTopBar from "../../components/AdminTopBar";
 
-// ── mock sessions (remove when backend endpoint is confirmed) ──────────────
-const MOCK_SESSIONS_TODAY = [
-  { id: 1, first_name: "Rahul",  last_name: "Sharma",  employee_id: "EMP-001", role: "employee", login_time: new Date(Date.now() - 1000*60*60*7).toISOString(), logout_time: new Date(Date.now() - 1000*60*30).toISOString() },
-  { id: 2, first_name: "Priya",  last_name: "Mehta",   employee_id: "EMP-002", role: "employee", login_time: new Date(Date.now() - 1000*60*60*6).toISOString(), logout_time: null },
-  { id: 3, first_name: "Sneha",  last_name: "Patel",   employee_id: "EMP-003", role: "employee", login_time: new Date(Date.now() - 1000*60*60*5).toISOString(), logout_time: new Date(Date.now() - 1000*60*60*2).toISOString() },
-  { id: 4, first_name: "Vikram", last_name: "Singh",   employee_id: "EMP-004", role: "employee", login_time: new Date(Date.now() - 1000*60*60*4).toISOString(), logout_time: null },
-  { id: 5, first_name: "Amit",   last_name: "Kumar",   employee_id: "ADM-001", role: "admin",    login_time: new Date(Date.now() - 1000*60*60*8).toISOString(), logout_time: new Date(Date.now() - 1000*60*60*1).toISOString() },
-];
-
 function fmt(iso) {
   if (!iso) return "—";
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -66,20 +57,21 @@ const Dashboard = () => {
     fetchSessions();
   }, []);
 
-  const fetchSessions = async () => {
-    try {
-      // TODO: swap mock for real API:
-      // const today = new Date().toISOString().split("T")[0];
-      // const res  = await apiCall(`/auth/sessions?date=${today}`);
-      // const data = await res.json();
-      // if (data.status === "success") setSessions(data.data || []);
+const fetchSessions = async () => {
+  try {
+    const today = new Date().toISOString().split("T")[0];
+    const res = await apiCall(`/auth/sessions?date=${today}`);
+    const data = await res.json();
 
-      // MOCK:
-      setSessions(MOCK_SESSIONS_TODAY);
-    } catch (err) {
-      console.error("Sessions fetch error:", err);
+    if (data.status === "success") {
+      setSessions(data.data || []);
+    } else {
+      console.error("Failed to fetch sessions");
     }
-  };
+  } catch (err) {
+    console.error("Sessions fetch error:", err);
+  }
+};
 
   const fetchEmpDetails = async (empId) => {
     if (empDetails[empId]) return;
@@ -243,7 +235,7 @@ const Dashboard = () => {
           <h2 className="text-lg font-semibold mb-3">Payroll — {getMonthName(stats?.payroll?.month)} {stats?.payroll?.year}</h2>
           <InfoRow label="Payslips Generated" value={stats?.payroll?.payslips_generated || 0} />
           <InfoRow label="Paid"               value={stats?.payroll?.paid               || 0} />
-          <InfoRow label="Pending Wages"      value={`${stats?.payroll?.pending_daily_wages || 0} (Rs.${stats?.payroll?.pending_wages_amount || 0})`} />
+          <InfoRow label="Pending Payment"      value={`${stats?.payroll?.pending_daily_wages || 0} (Rs.${stats?.payroll?.pending_wages_amount || 0})`} />
         </div>
       </div>
 

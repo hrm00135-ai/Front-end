@@ -42,6 +42,20 @@ const EmployeeDashboard = () => {
   const [payslips, setPayslips] = useState([]);
   const [salaryStructure, setSalaryStructure] = useState(null);
 
+  // AUTO CHECK-IN
+  useEffect(() => {
+    const autoCheckIn = async () => {
+      try {
+        await apiCall("/attendance/check-in", { method: "POST" });
+      } catch (e) {}
+    };
+
+    if (user?.id) {
+      autoCheckIn();
+    }
+  }, [user?.id]);
+
+  // FETCH DATA
   useEffect(() => {
     if (!user?.id) {
       setLoading(false);
