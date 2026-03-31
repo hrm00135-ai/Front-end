@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useSearchParams } from "react-router-dom";
 import Layout from "../../components/Layout";
 import TaskCard from "../../components/TaskCard";
 import TaskColumn from "../../components/TaskColumn";
@@ -6,7 +7,87 @@ import { Plus, X, Send, Edit3, Save } from "lucide-react";
 import { apiCall, BASE_URL } from "../../utils/api";
 import AdminTopBar from "../../components/AdminTopBar";
 
-// API status → column mapping
+// ── Date grouping helpers ──────────────────────────────────────────────────
+
+function isSameDay(d1, d2) {
+  return (
+    d1.getFullYear() === d2.getFullYear() &&
+    d1.getMonth() === d2.getMonth() &&
+    d1.getDate() === d2.getDate()
+  );
+}
+
+function groupTasksByDate(tasks) {
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfToday);
+  startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Sunday
+
+  const today = [], thisWeek = [], older = [];
+  for (const t of tasks) {
+    const d = new Date(t.created_at || t.assigned_at || 0);
+    if (isSameDay(d, now)) today.push(t);
+    else if (d >= startOfWeek) thisWeek.push(t);
+    else older.push(t);
+  }
+  return { today, thisWeek, older };
+}
+
+function DateGroupLabel({ label, count }) {
+  return (
+    <div style={{
+      fontSize: "10px", fontWeight: "700", letterSpacing: "0.08em",
+      textTransform: "uppercase", color: "#94a3b8",
+      padding: "6px 4px 4px", marginTop: "4px",
+      borderTop: "1px solid #f1f5f9",
+      display: "flex", justifyContent: "space-between",
+    }}>
+      <span>{label}</span>
+      <span style={{ background: "#f1f5f9", borderRadius: "10px", padding: "1px 7px", color: "#64748b" }}>
+        {count}
+      </span>
+    </div>
+  );
+}
+
+function OlderSection({ tasks, colKey, expandedCols, setExpandedCols, renderTask }) {
+  const isOpen = expandedCols.has(colKey);
+  return (
+    <div>
+      <button
+        onClick={() => {
+          setExpandedCols((prev) => {
+            const next = new Set(prev);
+            if (next.has(colKey)) next.delete(colKey);
+            else next.add(colKey);
+            return next;
+          });
+        }}
+        style={{
+          width: "100%", background: "none", border: "none", cursor: "pointer",
+          fontSize: "10px", fontWeight: "700", letterSpacing: "0.08em",
+          textTransform: "uppercase", color: "#94a3b8",
+          padding: "6px 4px 4px", marginTop: "4px",
+          borderTop: "1px solid #f1f5f9",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}
+      >
+        <span>Older</span>
+        <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+          <span style={{ background: "#f1f5f9", borderRadius: "10px", padding: "1px 7px", color: "#64748b" }}>
+            {tasks.length}
+          </span>
+          <span style={{ fontSize: "14px", transition: "transform 0.2s", display: "inline-block", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+            ▾
+          </span>
+        </span>
+      </button>
+      {isOpen && tasks.map((task) => renderTask(task))}
+    </div>
+  );
+}
+
+// ── API status → column mapping ────────────────────────────────────────────
 const COLUMNS = [
   { key: "pending", title: "New Tasks" },
   { key: "in_progress", title: "In Progress" },
@@ -64,10 +145,26 @@ const AssignTask = () => {
     attachment: null,
   });
 
+  // Track which Kanban columns have their "Older" section expanded
+  const [expandedOlderCols, setExpandedOlderCols] = useState(new Set());
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
   useEffect(() => {
     fetchTasks();
     fetchEmployees();
   }, []);
+
+  // Auto-open task detail if ?taskId=X is present (e.g. from a notification)
+  useEffect(() => {
+    const taskId = searchParams.get("taskId");
+    if (taskId) {
+      setSelectedTask(taskId);
+      fetchTaskDetail(taskId);
+      // Clean the URL so Back/refresh won't re-open
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams]);
 
   const fetchTasks = async () => {
     try {
@@ -558,26 +655,79 @@ const AssignTask = () => {
         </div>
       )}
 
-      {/* Kanban Columns */}
+      {/* Kanban Columns — date-grouped within each column */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        {COLUMNS.map((col) => (
-          <TaskColumn
-            key={col.key}
-            title={`${col.title} (${tasks.filter((t) => t.status === col.key).length})`}
-          >
-            {tasks
-              .filter((t) => t.status === col.key)
-              .map((task) => (
-                <TaskCard
-                  key={task.id}
-                  {...task}
-                  onDelete={() => deleteTask(task.id)}
-                  onMove={(dir) => moveTask(task.id, dir)}
-                  onClick={() => openTaskDetail(task)}
+        {COLUMNS.map((col) => {
+          const colTasks = tasks
+            .filter((t) => t.status === col.key)
+            .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+          const { today, thisWeek, older } = groupTasksByDate(colTasks);
+
+          return (
+            <TaskColumn
+              key={col.key}
+              title={`${col.title} (${colTasks.length})`}
+            >
+              {colTasks.length === 0 && (
+                <p style={{ fontSize: "12px", color: "#94a3b8", textAlign: "center", padding: "20px 0" }}>
+                  No tasks
+                </p>
+              )}
+
+              {/* TODAY */}
+              {today.length > 0 && (
+                <>
+                  <DateGroupLabel label="Today" count={today.length} />
+                  {today.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      {...task}
+                      onDelete={() => deleteTask(task.id)}
+                      onMove={(dir) => moveTask(task.id, dir)}
+                      onClick={() => openTaskDetail(task)}
+                    />
+                  ))}
+                </>
+              )}
+
+              {/* THIS WEEK */}
+              {thisWeek.length > 0 && (
+                <>
+                  <DateGroupLabel label="This Week" count={thisWeek.length} />
+                  {thisWeek.map((task) => (
+                    <TaskCard
+                      key={task.id}
+                      {...task}
+                      onDelete={() => deleteTask(task.id)}
+                      onMove={(dir) => moveTask(task.id, dir)}
+                      onClick={() => openTaskDetail(task)}
+                    />
+                  ))}
+                </>
+              )}
+
+              {/* OLDER — collapsible */}
+              {older.length > 0 && (
+                <OlderSection
+                  tasks={older}
+                  colKey={col.key}
+                  expandedCols={expandedOlderCols}
+                  setExpandedCols={setExpandedOlderCols}
+                  renderTask={(task) => (
+                    <TaskCard
+                      key={task.id}
+                      {...task}
+                      onDelete={() => deleteTask(task.id)}
+                      onMove={(dir) => moveTask(task.id, dir)}
+                      onClick={() => openTaskDetail(task)}
+                    />
+                  )}
                 />
-              ))}
-          </TaskColumn>
-        ))}
+              )}
+            </TaskColumn>
+          );
+        })}
       </div>
 
       {/* Task Detail Modal */}
