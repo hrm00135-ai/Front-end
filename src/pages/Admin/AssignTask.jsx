@@ -3,7 +3,7 @@ import Layout from "../../components/Layout";
 import TaskCard from "../../components/TaskCard";
 import TaskColumn from "../../components/TaskColumn";
 import { Plus, X, Send, Edit3, Save } from "lucide-react";
-import { apiCall } from "../../utils/api";
+import { apiCall, BASE_URL } from "../../utils/api";
 import AdminTopBar from "../../components/AdminTopBar";
 
 // API status → column mapping
@@ -44,6 +44,10 @@ const AssignTask = () => {
   const [editingTask, setEditingTask] = useState(false);
   const [editForm, setEditForm] = useState({});
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  // Admin attachment upload
+  const [adminFiles, setAdminFiles] = useState([]);
+  const [uploadingFiles, setUploadingFiles] = useState(false);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -115,6 +119,37 @@ const AssignTask = () => {
     setComments([]);
     setNewComment("");
     setEditingTask(false);
+    setAdminFiles([]);
+    setUploadingFiles(false);
+  };
+
+  // Upload attachments from admin detail modal
+  const handleAdminUpload = async () => {
+    if (!adminFiles.length || !selectedTask) return;
+    setUploadingFiles(true);
+    try {
+      const fd = new FormData();
+      for (const file of adminFiles) {
+        fd.append("files", file);
+      }
+      const res = await apiCall(`/tasks/${selectedTask}/attachments`, {
+        method: "POST",
+        body: fd,
+      });
+      const data = await res.json();
+      if (data.status === "success") {
+        setSuccess(data.message || "Files uploaded");
+        setAdminFiles([]);
+        fetchTaskDetail(selectedTask); // refresh to show new attachments
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        setError(data.message || "Upload failed");
+      }
+    } catch {
+      setError("Upload failed");
+    } finally {
+      setUploadingFiles(false);
+    }
   };
 
   // Create task
@@ -153,7 +188,11 @@ const AssignTask = () => {
     
       data.append("admin_notes", formData.admin_notes);
   
-      if (formData.attachment) {
+      if (formData.attachment && Array.isArray(formData.attachment)) {
+        for (const file of formData.attachment) {
+          data.append("attachments", file);
+        }
+      } else if (formData.attachment) {
         data.append("attachment", formData.attachment);
       }
     
@@ -487,16 +526,24 @@ const AssignTask = () => {
             {/* Task Attachment Field */}
             <div style={{ gridColumn: "1 / -1" }}>
               <label className="block text-sm font-medium mb-1">
-                Task Attachment (Photo/Video)
+                Task Attachments (Photos/Videos — multiple allowed)
               </label>
               <input
                 type="file"
                 accept="image/*,video/*"
+                multiple
                 onChange={(e) =>
-                  setFormData({ ...formData, attachment: e.target.files[0] })
+                  setFormData({ ...formData, attachment: [...e.target.files] })
                 }
                 className="border rounded-lg p-2 w-full"
               />
+              {formData.attachment && formData.attachment.length > 0 && (
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "6px" }}>
+                  {formData.attachment.map((f, i) => (
+                    <span key={i}>{f.name}{i < formData.attachment.length - 1 ? ", " : ""}</span>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -911,6 +958,74 @@ const AssignTask = () => {
                       </p>
                     </div>
                   )}
+
+                  {/* ── ATTACHMENTS (images + videos) — admin review ── */}
+                  {taskDetail.attachments && taskDetail.attachments.length > 0 && (
+                    <div style={{ marginBottom: "20px" }}>
+                      <h4 style={{ fontWeight: "600", fontSize: "15px", marginBottom: "12px" }}>
+                        📎 Attachments ({taskDetail.attachments.length})
+                      </h4>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
+                        {taskDetail.attachments.map((att) => {
+                          const url = att.file_url?.startsWith("http")
+                            ? att.file_url
+                            : `${BASE_URL}/${att.file_url}`;
+                          return (
+                            <div key={att.id} style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid #e2e8f0" }}>
+                              {att.file_type === "video" ? (
+                                <video controls style={{ width: "100%", maxHeight: "180px", objectFit: "cover", display: "block" }}>
+                                  <source src={url} />
+                                </video>
+                              ) : (
+                                <img
+                                  src={url}
+                                  alt={att.original_name || "attachment"}
+                                  style={{ width: "100%", maxHeight: "180px", objectFit: "cover", display: "block", cursor: "pointer" }}
+                                  onClick={() => window.open(url, "_blank")}
+                                />
+                              )}
+                              <div style={{ padding: "4px 8px", fontSize: "11px", color: "#94a3b8", background: "#f8fafc" }}>
+                                {att.user_role === "employee" ? "👷 Employee" : "👔 Admin"} • {att.original_name || ""}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── Admin Upload Attachments ── */}
+                  <div style={{ marginBottom: "16px", padding: "12px", background: "#f8fafc", borderRadius: "8px", border: "1px dashed #cbd5e1" }}>
+                    <p style={{ fontSize: "13px", fontWeight: "600", marginBottom: "8px", color: "#475569" }}>📎 Upload Images / Videos</p>
+                    <input
+                      type="file"
+                      accept="image/*,video/*"
+                      multiple
+                      onChange={(e) => setAdminFiles([...e.target.files])}
+                      style={{ marginBottom: "8px", width: "100%", fontSize: "13px" }}
+                    />
+                    {adminFiles.length > 0 && (
+                      <div style={{ marginBottom: "8px" }}>
+                        {adminFiles.map((f, i) => (
+                          <div key={i} style={{ fontSize: "12px", color: "#64748b" }}>
+                            {f.type?.startsWith("video") ? "🎬" : "🖼"} {f.name} ({(f.size / 1024).toFixed(0)} KB)
+                          </div>
+                        ))}
+                        <button
+                          onClick={handleAdminUpload}
+                          disabled={uploadingFiles}
+                          style={{
+                            marginTop: "8px", background: "#2563eb", color: "white",
+                            padding: "8px 20px", borderRadius: "6px", border: "none",
+                            cursor: "pointer", fontWeight: "600", fontSize: "13px",
+                            opacity: uploadingFiles ? 0.6 : 1,
+                          }}
+                        >
+                          {uploadingFiles ? "Uploading & Compressing..." : `Upload ${adminFiles.length} file(s)`}
+                        </button>
+                      </div>
+                    )}
+                  </div>
 
                   {/* Comments */}
                   <div
