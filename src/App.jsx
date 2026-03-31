@@ -149,8 +149,7 @@ function App() {
             <EmployeeProfilePage />
           </ProtectedRoute>
         } />
-
-
+        
       </Routes>
     </BrowserRouter>
     </ErrorBoundary>

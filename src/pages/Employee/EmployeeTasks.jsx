@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { apiCall } from "../../utils/api";
+import { apiCall, BASE_URL } from "../../utils/api";
 import Layout from "../../components/Layout";
 
 const EmployeeTasks = () => {
@@ -9,7 +9,10 @@ const EmployeeTasks = () => {
   const [uploadingFor, setUploadingFor] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [submitting, setSubmitting] = useState(null);
-  const [viewTask, setViewTask] = useState(null); // NEW
+
+  // View detail modal — stores FULL task fetched from API
+  const [viewTask, setViewTask] = useState(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
 
   useEffect(() => {
     fetchTasks();
@@ -19,10 +22,8 @@ const EmployeeTasks = () => {
     try {
       setLoading(true);
       setError("");
-
       const res = await apiCall("/tasks/");
       const data = await res.json();
-
       if (data.status === "success") {
         setTasks(data.data?.tasks || data.data || []);
       } else {
@@ -34,6 +35,23 @@ const EmployeeTasks = () => {
       setError("Failed to load tasks");
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ── Fetch full task detail (comments + attachments) ──
+  const openViewDetail = async (taskId) => {
+    setLoadingDetail(true);
+    setViewTask(null);
+    try {
+      const res = await apiCall(`/tasks/${taskId}`);
+      const data = await res.json();
+      if (data.status === "success") {
+        setViewTask(data.data);
+      }
+    } catch (err) {
+      console.error("Fetch detail failed:", err);
+    } finally {
+      setLoadingDetail(false);
     }
   };
 
@@ -49,16 +67,23 @@ const EmployeeTasks = () => {
     }
   };
 
+  // ── Actually upload files then submit for review ──
   const submitForReview = async (id) => {
     setSubmitting(id);
     try {
-      for (const file of selectedFiles) {
-        await apiCall(`/tasks/${id}/comments`, {
+      // 1. Upload actual files via FormData
+      if (selectedFiles.length > 0) {
+        const fd = new FormData();
+        for (const file of selectedFiles) {
+          fd.append("files", file);
+        }
+        await apiCall(`/tasks/${id}/attachments`, {
           method: "POST",
-          body: JSON.stringify({ comment: `📸 Image submitted: ${file.name}` }),
+          body: fd,
         });
       }
 
+      // 2. Move status to on_hold (review)
       await apiCall(`/tasks/${id}`, {
         method: "PUT",
         body: JSON.stringify({ status: "on_hold" }),
@@ -71,6 +96,27 @@ const EmployeeTasks = () => {
       console.error("Submit for review failed:", err);
     } finally {
       setSubmitting(null);
+    }
+  };
+
+  // ── Build proper URL for uploaded files ──
+  const fileUrl = (path) => {
+    if (!path) return "";
+    if (path.startsWith("http")) return path;
+    // path is like "uploads/tasks/5/file.jpg" → BASE_URL + "/" + path
+    return `${BASE_URL}/${path}`;
+  };
+
+  const fmtDate = (d) => {
+    if (!d) return "—";
+    try {
+      return new Date(d).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+    } catch {
+      return d;
     }
   };
 
@@ -136,14 +182,36 @@ const EmployeeTasks = () => {
                     {task.description || "No description"}
                   </p>
 
-                  {/* NEW META */}
+                  {/* Meta info */}
                   <div style={{ fontSize: "12px", color: "#475569", marginBottom: "10px" }}>
-                    📅 Assigned: {task.created_at || "—"} <br />
-                    ⏰ Due: {task.due_date || "—"} <br />
+                    📅 Assigned: {fmtDate(task.created_at)} <br />
+                    ⏰ Due: {fmtDate(task.due_date)} <br />
                     💰 Payment: ₹{task.payment_amount || 0}
                   </div>
 
-                  {/* Meta Chips */}
+                  {/* Thumbnails preview if attachments exist */}
+                  {task.attachments && task.attachments.length > 0 && (
+                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginBottom: "10px" }}>
+                      {task.attachments.slice(0, 3).map((att) => (
+                        <div key={att.id} style={{ width: "48px", height: "48px", borderRadius: "6px", overflow: "hidden", border: "1px solid #e2e8f0" }}>
+                          {att.file_type === "video" ? (
+                            <div style={{ width: "100%", height: "100%", background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center", color: "white", fontSize: "16px" }}>
+                              ▶
+                            </div>
+                          ) : (
+                            <img src={fileUrl(att.file_url)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          )}
+                        </div>
+                      ))}
+                      {task.attachments.length > 3 && (
+                        <div style={{ width: "48px", height: "48px", borderRadius: "6px", background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#64748b", fontWeight: "600" }}>
+                          +{task.attachments.length - 3}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Category + Priority chips */}
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
                     {task.category && (
                       <span style={{ background: "#f1f5f9", padding: "3px 10px", borderRadius: "6px", fontSize: "12px", color: "#475569" }}>
@@ -175,7 +243,7 @@ const EmployeeTasks = () => {
                 {/* ACTIONS */}
                 <div style={{ marginTop: "16px" }}>
                   <button
-                    onClick={() => setViewTask(task)}
+                    onClick={() => openViewDetail(task.id)}
                     style={{
                       width: "100%",
                       padding: "10px",
@@ -184,6 +252,7 @@ const EmployeeTasks = () => {
                       background: "white",
                       cursor: "pointer",
                       marginBottom: "8px",
+                      fontSize: "14px",
                     }}
                   >
                     👁 View Details
@@ -228,24 +297,28 @@ const EmployeeTasks = () => {
                             color: "#475569",
                           }}
                         >
-                          📸 Upload Images & Submit for Review
+                          📸 Upload Images/Videos & Submit for Review
                         </button>
                       ) : (
                         <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", padding: "14px", background: "#f8fafc" }}>
                           <input
                             type="file"
-                            accept="image/*"
+                            accept="image/*,video/*"
                             multiple
                             onChange={(e) => setSelectedFiles([...e.target.files])}
-                            style={{ marginBottom: "10px" }}
+                            style={{ marginBottom: "10px", width: "100%" }}
                           />
 
                           {selectedFiles.length > 0 && (
-                            <ul style={{ fontSize: "12px", marginBottom: "10px" }}>
+                            <div style={{ fontSize: "12px", marginBottom: "10px", color: "#475569" }}>
                               {selectedFiles.map((file, i) => (
-                                <li key={i}>{file.name}</li>
+                                <div key={i} style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+                                  <span>{file.type.startsWith("video") ? "🎬" : "🖼"}</span>
+                                  <span>{file.name}</span>
+                                  <span style={{ color: "#94a3b8" }}>({(file.size / 1024).toFixed(0)} KB)</span>
+                                </div>
                               ))}
-                            </ul>
+                            </div>
                           )}
 
                           <div style={{ display: "flex", gap: "8px" }}>
@@ -260,11 +333,12 @@ const EmployeeTasks = () => {
                                 cursor: "pointer",
                                 fontWeight: "600",
                                 fontSize: "13px",
-                                background: "#16a34a",
+                                background: selectedFiles.length === 0 ? "#94a3b8" : "#16a34a",
                                 color: "white",
+                                opacity: submitting === task.id ? 0.6 : 1,
                               }}
                             >
-                              {submitting === task.id ? "Submitting..." : "✓ Submit"}
+                              {submitting === task.id ? "Uploading & Submitting..." : "✓ Submit for Review"}
                             </button>
 
                             <button
@@ -323,70 +397,187 @@ const EmployeeTasks = () => {
           </div>
         )}
 
-        {/* VIEW DETAILS MODAL */}
-        {viewTask && (
-          <div style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(0,0,0,0.5)",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 50,
-          }}>
+        {/* ── VIEW DETAILS MODAL ── */}
+        {(viewTask || loadingDetail) && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              background: "rgba(0,0,0,0.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              zIndex: 50,
+              padding: "16px",
+            }}
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !loadingDetail) {
+                setViewTask(null);
+              }
+            }}
+          >
             <div style={{
               background: "white",
-              padding: "20px",
-              borderRadius: "12px",
-              width: "400px",
-              maxHeight: "80vh",
+              padding: "24px",
+              borderRadius: "16px",
+              width: "100%",
+              maxWidth: "550px",
+              maxHeight: "85vh",
               overflowY: "auto",
+              boxShadow: "0 20px 60px rgba(0,0,0,0.2)",
             }}>
-              <h2>{viewTask.title}</h2>
-              <p>{viewTask.description}</p>
-
-              {/* Task Attachment */}
-              {viewTask.attachment_url && (
-                <div style={{ marginTop: "10px" }}>
-                  <p style={{ fontWeight: "600" }}>Task Attachment:</p>
-              
-                  {viewTask.attachment_url.match(/\.(mp4|webm|ogg)$/) ? (
-                    <video controls style={{ width: "100%", marginTop: "8px", borderRadius: "8px" }}>
-                      <source src={viewTask.attachment_url} />
-                    </video>
-                  ) : (
-                    <img
-                      src={viewTask.attachment_url}
-                      alt="Task Attachment"
-                      style={{ width: "100%", marginTop: "8px", borderRadius: "8px", border: "1px solid #e2e8f0" }}
-                    />
-                  )}
+              {loadingDetail ? (
+                <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+                  Loading task details...
                 </div>
-              )}
+              ) : viewTask ? (
+                <>
+                  {/* Header */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
+                    <h2 style={{ fontSize: "20px", fontWeight: "700", color: "#1e293b", flex: 1 }}>
+                      {viewTask.title}
+                    </h2>
+                    <button
+                      onClick={() => setViewTask(null)}
+                      style={{ background: "none", border: "none", cursor: "pointer", fontSize: "22px", color: "#94a3b8", padding: "0 0 0 12px" }}
+                    >
+                      ×
+                    </button>
+                  </div>
 
-              <h4>Comments:</h4>
-              {viewTask.comments?.length > 0 ? (
-                viewTask.comments.map((c, i) => (
-                  <p key={i}>• {c.comment}</p>
-                ))
-              ) : (
-                <p>No comments</p>
-              )}
+                  {/* Status + Priority */}
+                  <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "16px" }}>
+                    <span style={{
+                      padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "600",
+                      background: viewTask.status === "pending" ? "#fef3c7" : viewTask.status === "in_progress" ? "#dbeafe" : viewTask.status === "on_hold" ? "#fef9c3" : viewTask.status === "completed" ? "#dcfce7" : "#f1f5f9",
+                      color: viewTask.status === "pending" ? "#d97706" : viewTask.status === "in_progress" ? "#2563eb" : viewTask.status === "on_hold" ? "#a16207" : viewTask.status === "completed" ? "#16a34a" : "#64748b",
+                    }}>
+                      {viewTask.status?.replace("_", " ")}
+                    </span>
+                    <span style={{
+                      padding: "4px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "600",
+                      background: `${prioColor(viewTask.priority)}15`, color: prioColor(viewTask.priority),
+                    }}>
+                      {viewTask.priority}
+                    </span>
+                    {viewTask.category && (
+                      <span style={{ background: "#f1f5f9", padding: "4px 12px", borderRadius: "20px", fontSize: "12px", color: "#475569" }}>
+                        {viewTask.category}
+                      </span>
+                    )}
+                  </div>
 
-              <button
-                onClick={() => setViewTask(null)}
-                style={{
-                  marginTop: "10px",
-                  padding: "10px",
-                  width: "100%",
-                  borderRadius: "6px",
-                  border: "none",
-                  background: "#3b82f6",
-                  color: "white",
-                }}
-              >
-                Close
-              </button>
+                  {/* Description */}
+                  {viewTask.description && (
+                    <p style={{ color: "#475569", fontSize: "14px", lineHeight: "1.6", marginBottom: "16px" }}>
+                      {viewTask.description}
+                    </p>
+                  )}
+
+                  {/* Info grid */}
+                  <div style={{
+                    display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px",
+                    background: "#f8fafc", padding: "14px", borderRadius: "10px", marginBottom: "16px",
+                    fontSize: "13px",
+                  }}>
+                    <div><span style={{ color: "#94a3b8" }}>Assigned:</span> <strong>{fmtDate(viewTask.created_at)}</strong></div>
+                    <div><span style={{ color: "#94a3b8" }}>Due:</span> <strong>{fmtDate(viewTask.due_date)}</strong></div>
+                    <div><span style={{ color: "#94a3b8" }}>Payment:</span> <strong style={{ color: "#16a34a" }}>₹{viewTask.payment_amount || 0}</strong></div>
+                    <div><span style={{ color: "#94a3b8" }}>Weight:</span> <strong>{viewTask.weight_grams || "—"}g</strong></div>
+                    <div><span style={{ color: "#94a3b8" }}>Qty:</span> <strong>{viewTask.quantity || "—"}</strong></div>
+                    <div><span style={{ color: "#94a3b8" }}>Est Hours:</span> <strong>{viewTask.estimated_hours || "—"}</strong></div>
+                  </div>
+
+                  {/* Admin Notes */}
+                  {viewTask.admin_notes && (
+                    <div style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: "8px", padding: "12px", marginBottom: "16px" }}>
+                      <p style={{ fontSize: "12px", color: "#92400e", fontWeight: "600", marginBottom: "4px" }}>Admin Notes</p>
+                      <p style={{ fontSize: "13px", color: "#78350f" }}>{viewTask.admin_notes}</p>
+                    </div>
+                  )}
+
+                  {/* ── ATTACHMENTS (images + videos) ── */}
+                  {viewTask.attachments && viewTask.attachments.length > 0 && (
+                    <div style={{ marginBottom: "16px" }}>
+                      <h4 style={{ fontWeight: "600", fontSize: "14px", marginBottom: "10px", color: "#1e293b" }}>
+                        📎 Attachments ({viewTask.attachments.length})
+                      </h4>
+                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
+                        {viewTask.attachments.map((att) => (
+                          <div key={att.id} style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid #e2e8f0", position: "relative" }}>
+                            {att.file_type === "video" ? (
+                              <video
+                                controls
+                                style={{ width: "100%", maxHeight: "200px", objectFit: "cover", display: "block" }}
+                              >
+                                <source src={fileUrl(att.file_url)} />
+                              </video>
+                            ) : (
+                              <img
+                                src={fileUrl(att.file_url)}
+                                alt={att.original_name || "attachment"}
+                                style={{ width: "100%", maxHeight: "200px", objectFit: "cover", display: "block", cursor: "pointer" }}
+                                onClick={() => window.open(fileUrl(att.file_url), "_blank")}
+                              />
+                            )}
+                            <div style={{ padding: "4px 8px", fontSize: "11px", color: "#94a3b8", background: "#f8fafc" }}>
+                              {att.user_role === "admin" || att.user_role === "super_admin" ? "👔 Admin" : "👷 Employee"} • {fmtDate(att.created_at)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── COMMENTS ── */}
+                  <div style={{ borderTop: "1px solid #e2e8f0", paddingTop: "14px" }}>
+                    <h4 style={{ fontWeight: "600", fontSize: "14px", marginBottom: "10px", color: "#1e293b" }}>
+                      💬 Comments ({viewTask.comments?.length || 0})
+                    </h4>
+                    {viewTask.comments?.length > 0 ? (
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px", maxHeight: "200px", overflowY: "auto" }}>
+                        {viewTask.comments.map((c, i) => (
+                          <div key={c.id || i} style={{
+                            background: "#f8fafc", borderRadius: "8px", padding: "10px 12px",
+                            border: "1px solid #e2e8f0",
+                          }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                              <span style={{ fontSize: "12px", fontWeight: "600", color: "#1e293b" }}>
+                                {c.user_name || "User"} {c.user_role === "admin" || c.user_role === "super_admin" ? "👔" : ""}
+                              </span>
+                              <span style={{ fontSize: "11px", color: "#94a3b8" }}>
+                                {c.created_at ? fmtDate(c.created_at) : ""}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: "13px", color: "#475569" }}>{c.comment}</p>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p style={{ color: "#94a3b8", fontSize: "13px" }}>No comments yet</p>
+                    )}
+                  </div>
+
+                  {/* Close button */}
+                  <button
+                    onClick={() => setViewTask(null)}
+                    style={{
+                      marginTop: "16px",
+                      padding: "10px",
+                      width: "100%",
+                      borderRadius: "8px",
+                      border: "none",
+                      background: "#1e293b",
+                      color: "white",
+                      fontWeight: "600",
+                      fontSize: "14px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Close
+                  </button>
+                </>
+              ) : null}
             </div>
           </div>
         )}
