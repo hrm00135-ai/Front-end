@@ -9,6 +9,7 @@ const EmployeeTasks = () => {
   const [uploadingFor, setUploadingFor] = useState(null);
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [submitting, setSubmitting] = useState(null);
+  const [viewTask, setViewTask] = useState(null); // NEW
 
   useEffect(() => {
     fetchTasks();
@@ -51,7 +52,6 @@ const EmployeeTasks = () => {
   const submitForReview = async (id) => {
     setSubmitting(id);
     try {
-      // Log each uploaded image as a comment
       for (const file of selectedFiles) {
         await apiCall(`/tasks/${id}/comments`, {
           method: "POST",
@@ -59,7 +59,6 @@ const EmployeeTasks = () => {
         });
       }
 
-      // Move task to review (on_hold = review column in admin Kanban)
       await apiCall(`/tasks/${id}`, {
         method: "PUT",
         body: JSON.stringify({ status: "on_hold" }),
@@ -83,28 +82,34 @@ const EmployeeTasks = () => {
   return (
     <Layout>
       <div style={{ padding: "16px", width: "100%" }}>
-        <h1 style={{ fontSize: "22px", fontWeight: "bold", marginBottom: "20px" }}>My Tasks</h1>
+        <h1 style={{ fontSize: "22px", fontWeight: "bold", marginBottom: "20px" }}>
+          My Tasks
+        </h1>
 
-        {/* Loading */}
         {loading && (
-          <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>Loading tasks...</div>
-        )}
-
-        {/* Error */}
-        {!loading && error && (
-          <div style={{ background: "#fee2e2", color: "#dc2626", padding: "12px", borderRadius: "8px", marginBottom: "16px", fontSize: "14px" }}>{error}</div>
-        )}
-
-        {/* Empty */}
-        {!loading && !error && tasks.length === 0 && (
-          <div style={{ textAlign: "center", padding: "60px 20px", color: "#94a3b8" }}>
-            <div style={{ fontSize: "40px", marginBottom: "12px" }}>📋</div>
-            <p style={{ fontSize: "18px", fontWeight: "600", color: "#64748b" }}>No tasks assigned</p>
-            <p style={{ fontSize: "14px", marginTop: "4px" }}>You're all caught up</p>
+          <div style={{ textAlign: "center", padding: "40px", color: "#94a3b8" }}>
+            Loading tasks...
           </div>
         )}
 
-        {/* Task Grid */}
+        {!loading && error && (
+          <div style={{ background: "#fee2e2", color: "#dc2626", padding: "12px", borderRadius: "8px", marginBottom: "16px", fontSize: "14px" }}>
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && tasks.length === 0 && (
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "#94a3b8" }}>
+            <div style={{ fontSize: "40px", marginBottom: "12px" }}>📋</div>
+            <p style={{ fontSize: "18px", fontWeight: "600", color: "#64748b" }}>
+              No tasks assigned
+            </p>
+            <p style={{ fontSize: "14px", marginTop: "4px" }}>
+              You're all caught up
+            </p>
+          </div>
+        )}
+
         {!loading && tasks.length > 0 && (
           <div style={{ display: "grid", gap: "16px", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))" }}>
             {tasks.map((task) => (
@@ -131,7 +136,14 @@ const EmployeeTasks = () => {
                     {task.description || "No description"}
                   </p>
 
-                  {/* Meta */}
+                  {/* NEW META */}
+                  <div style={{ fontSize: "12px", color: "#475569", marginBottom: "10px" }}>
+                    📅 Assigned: {task.created_at || "—"} <br />
+                    ⏰ Due: {task.due_date || "—"} <br />
+                    💰 Payment: ₹{task.payment_amount || 0}
+                  </div>
+
+                  {/* Meta Chips */}
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "12px" }}>
                     {task.category && (
                       <span style={{ background: "#f1f5f9", padding: "3px 10px", borderRadius: "6px", fontSize: "12px", color: "#475569" }}>
@@ -141,11 +153,6 @@ const EmployeeTasks = () => {
                     <span style={{ background: `${prioColor(task.priority)}15`, color: prioColor(task.priority), padding: "3px 10px", borderRadius: "6px", fontSize: "12px", fontWeight: "600" }}>
                       {task.priority}
                     </span>
-                    {task.due_date && (
-                      <span style={{ background: "#f1f5f9", padding: "3px 10px", borderRadius: "6px", fontSize: "12px", color: "#475569" }}>
-                        Due: {task.due_date}
-                      </span>
-                    )}
                   </div>
 
                   {/* Status Badge */}
@@ -165,76 +172,114 @@ const EmployeeTasks = () => {
                   </span>
                 </div>
 
-                {/* === WORKFLOW ACTIONS === */}
+                {/* ACTIONS */}
                 <div style={{ marginTop: "16px" }}>
+                  <button
+                    onClick={() => setViewTask(task)}
+                    style={{
+                      width: "100%",
+                      padding: "10px",
+                      borderRadius: "8px",
+                      border: "1px solid #cbd5e1",
+                      background: "white",
+                      cursor: "pointer",
+                      marginBottom: "8px",
+                    }}
+                  >
+                    👁 View Details
+                  </button>
 
-                  {/* PENDING → Start button */}
                   {task.status === "pending" && (
                     <button
                       onClick={() => startTask(task.id)}
                       style={{
-                        width: "100%", padding: "12px", borderRadius: "8px", border: "none",
-                        cursor: "pointer", fontWeight: "600", fontSize: "14px",
-                        background: "#3b82f6", color: "white",
+                        width: "100%",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        border: "none",
+                        cursor: "pointer",
+                        fontWeight: "600",
+                        fontSize: "14px",
+                        background: "#3b82f6",
+                        color: "white",
                       }}
                     >
                       ▶ Start Task
                     </button>
                   )}
 
-                  {/* IN PROGRESS → Upload & submit for review */}
                   {task.status === "in_progress" && (
                     <div>
                       {uploadingFor !== task.id ? (
                         <button
-                          onClick={() => setUploadingFor(task.id)}
+                          onClick={() => {
+                            setUploadingFor(task.id);
+                            setSelectedFiles([]);
+                          }}
                           style={{
-                            width: "100%", padding: "12px", borderRadius: "8px",
-                            border: "2px dashed #cbd5e1", cursor: "pointer",
-                            fontWeight: "600", fontSize: "14px",
-                            background: "white", color: "#475569",
+                            width: "100%",
+                            padding: "12px",
+                            borderRadius: "8px",
+                            border: "2px dashed #cbd5e1",
+                            cursor: "pointer",
+                            fontWeight: "600",
+                            fontSize: "14px",
+                            background: "white",
+                            color: "#475569",
                           }}
                         >
                           📸 Upload Images & Submit for Review
                         </button>
                       ) : (
                         <div style={{ border: "1px solid #e2e8f0", borderRadius: "8px", padding: "14px", background: "#f8fafc" }}>
-                          <p style={{ fontSize: "13px", fontWeight: "600", color: "#475569", marginBottom: "8px" }}>
-                            Upload task images
-                          </p>
                           <input
                             type="file"
                             accept="image/*"
                             multiple
                             onChange={(e) => setSelectedFiles([...e.target.files])}
-                            style={{ fontSize: "13px", marginBottom: "10px", width: "100%" }}
+                            style={{ marginBottom: "10px" }}
                           />
+
                           {selectedFiles.length > 0 && (
-                            <p style={{ fontSize: "12px", color: "#16a34a", marginBottom: "10px" }}>
-                              ✓ {selectedFiles.length} file(s) selected
-                            </p>
+                            <ul style={{ fontSize: "12px", marginBottom: "10px" }}>
+                              {selectedFiles.map((file, i) => (
+                                <li key={i}>{file.name}</li>
+                              ))}
+                            </ul>
                           )}
+
                           <div style={{ display: "flex", gap: "8px" }}>
                             <button
                               onClick={() => submitForReview(task.id)}
                               disabled={selectedFiles.length === 0 || submitting === task.id}
                               style={{
-                                flex: 1, padding: "10px", borderRadius: "6px", border: "none",
-                                cursor: selectedFiles.length === 0 ? "not-allowed" : "pointer",
-                                fontWeight: "600", fontSize: "13px",
-                                background: selectedFiles.length === 0 ? "#e2e8f0" : "#16a34a",
-                                color: selectedFiles.length === 0 ? "#94a3b8" : "white",
-                                opacity: submitting === task.id ? 0.6 : 1,
+                                flex: 1,
+                                padding: "10px",
+                                borderRadius: "6px",
+                                border: "none",
+                                cursor: "pointer",
+                                fontWeight: "600",
+                                fontSize: "13px",
+                                background: "#16a34a",
+                                color: "white",
                               }}
                             >
-                              {submitting === task.id ? "Submitting..." : "✓ Submit for Review"}
+                              {submitting === task.id ? "Submitting..." : "✓ Submit"}
                             </button>
+
                             <button
-                              onClick={() => { setUploadingFor(null); setSelectedFiles([]); }}
+                              onClick={() => {
+                                setUploadingFor(null);
+                                setSelectedFiles([]);
+                              }}
                               style={{
-                                padding: "10px 14px", borderRadius: "6px",
-                                border: "1px solid #cbd5e1", cursor: "pointer",
-                                fontSize: "13px", background: "white", color: "#64748b",
+                                padding: "10px 14px",
+                                borderRadius: "6px",
+                                border: "1px solid #cbd5e1",
+                                cursor: "pointer",
+                                fontSize: "13px",
+                                background: "white",
+                                color: "#64748b",
                               }}
                             >
                               Cancel
@@ -245,29 +290,104 @@ const EmployeeTasks = () => {
                     </div>
                   )}
 
-                  {/* ON HOLD (REVIEW) → Waiting message */}
                   {task.status === "on_hold" && (
                     <div style={{
-                      background: "#fef3c7", color: "#92400e", padding: "12px",
-                      borderRadius: "8px", textAlign: "center", fontSize: "13px", fontWeight: "600",
+                      background: "#fef3c7",
+                      color: "#92400e",
+                      padding: "12px",
+                      borderRadius: "8px",
+                      textAlign: "center",
+                      fontSize: "13px",
+                      fontWeight: "600",
                     }}>
-                      ⏳ Submitted for review — Waiting for admin approval
+                      ⏳ Submitted — Waiting for admin approval
                     </div>
                   )}
 
-                  {/* COMPLETED → Done */}
                   {task.status === "completed" && (
                     <div style={{
-                      background: "#dcfce7", color: "#166534", padding: "12px",
-                      borderRadius: "8px", textAlign: "center", fontSize: "13px", fontWeight: "600",
+                      background: "#dcfce7",
+                      color: "#166534",
+                      padding: "12px",
+                      borderRadius: "8px",
+                      textAlign: "center",
+                      fontSize: "13px",
+                      fontWeight: "600",
                     }}>
-                      ✅ Task completed — Approved by admin
+                      ✅ Task completed — Approved
                     </div>
                   )}
-
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* VIEW DETAILS MODAL */}
+        {viewTask && (
+          <div style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 50,
+          }}>
+            <div style={{
+              background: "white",
+              padding: "20px",
+              borderRadius: "12px",
+              width: "400px",
+              maxHeight: "80vh",
+              overflowY: "auto",
+            }}>
+              <h2>{viewTask.title}</h2>
+              <p>{viewTask.description}</p>
+
+              {/* Task Attachment */}
+              {viewTask.attachment_url && (
+                <div style={{ marginTop: "10px" }}>
+                  <p style={{ fontWeight: "600" }}>Task Attachment:</p>
+              
+                  {viewTask.attachment_url.match(/\.(mp4|webm|ogg)$/) ? (
+                    <video controls style={{ width: "100%", marginTop: "8px", borderRadius: "8px" }}>
+                      <source src={viewTask.attachment_url} />
+                    </video>
+                  ) : (
+                    <img
+                      src={viewTask.attachment_url}
+                      alt="Task Attachment"
+                      style={{ width: "100%", marginTop: "8px", borderRadius: "8px", border: "1px solid #e2e8f0" }}
+                    />
+                  )}
+                </div>
+              )}
+
+              <h4>Comments:</h4>
+              {viewTask.comments?.length > 0 ? (
+                viewTask.comments.map((c, i) => (
+                  <p key={i}>• {c.comment}</p>
+                ))
+              ) : (
+                <p>No comments</p>
+              )}
+
+              <button
+                onClick={() => setViewTask(null)}
+                style={{
+                  marginTop: "10px",
+                  padding: "10px",
+                  width: "100%",
+                  borderRadius: "6px",
+                  border: "none",
+                  background: "#3b82f6",
+                  color: "white",
+                }}
+              >
+                Close
+              </button>
+            </div>
           </div>
         )}
       </div>
