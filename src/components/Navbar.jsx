@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { getUser, logout, apiCall } from "../utils/api";
+import { useNavigate } from "react-router-dom";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
@@ -60,22 +61,42 @@ const Navbar = () => {
   const [notifications, setNotifications] = useState([]);
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef(null);
-
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
-  // ── fetch notifications ──
-const fetchNotifications = async () => {
-  try {
-    const res = await apiCall("/notifications");
-    const data = await res.json();
+  const navigate = useNavigate();
 
-    if (data.status === "success") {
-      setNotifications(data.data || []);
+  const fetchNotifications = async () => {
+    try {
+      const res = await apiCall("/notifications");
+      const data = await res.json();
+
+      if (data.status === "success") {
+        setNotifications(data.data || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch notifications:", err);
     }
-  } catch (err) {
-    console.error("Failed to fetch notifications:", err);
-  }
-};
+  };
+
+  const handleNotificationClick = async (n) => {
+    try {
+      await apiCall(`/notifications/${n.id}/read`, {
+        method: "PUT",
+      });
+
+      if (n.type === "task") {
+        navigate("/employee/tasks");
+      } else if (n.type === "leave") {
+        navigate("/employee/leaves");
+      } else if (n.type === "payroll") {
+        navigate("/employee/payroll");
+      }
+
+      setOpen(false);
+    } catch (err) {
+      console.error("Notification click failed:", err);
+    }
+  };
 
   useEffect(() => {
     fetchNotifications();
@@ -97,8 +118,12 @@ const fetchNotifications = async () => {
   // ── mark all as read ──
   const markAllRead = async () => {
     try {
-      // TODO: await apiCall("/notifications/read-all", { method: "POST" });
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+      await apiCall("/notifications/mark-all-read", {
+        method: "PUT",
+      });
+
+      // Refresh from backend (BEST way)
+      fetchNotifications();
     } catch (err) {
       console.error("Failed to mark notifications as read:", err);
     }
@@ -107,10 +132,11 @@ const fetchNotifications = async () => {
   // ── mark single as read ──
   const markRead = async (id) => {
     try {
-      // TODO: await apiCall(`/notifications/${id}/read`, { method: "POST" });
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)),
-      );
+      await apiCall(`/notifications/${id}/read`, {
+        method: "PUT",
+      });
+
+      fetchNotifications(); // sync with backend
     } catch (err) {
       console.error("Failed to mark notification as read:", err);
     }
@@ -284,7 +310,7 @@ const fetchNotifications = async () => {
                   notifications.map((n) => (
                     <div
                       key={n.id}
-                      onClick={() => markRead(n.id)}
+                      onClick={() => handleNotificationClick(n)}
                       style={{
                         padding: "12px 16px",
                         borderBottom: "1px solid #f8fafc",
