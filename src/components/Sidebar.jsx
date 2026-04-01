@@ -58,6 +58,7 @@ const Sidebar = () => {
             <span style={sectionLabel("Finance")}>Finance</span>
             <li><Link to="/admin/payroll" style={linkStyle("/admin/payroll")}>Payroll</Link></li>
             <li><Link to="/admin/metals" style={linkStyle("/admin/metals")}>Metal Prices</Link></li>
+            <li><Link to="/admin/payments" style={linkStyle("/admin/payments")}>Payments</Link></li>
 
             <span style={sectionLabel("Admin")}>Admin</span>
             <li><Link to="/admin/login-activity" style={linkStyle("/admin/login-activity")}>Login Activity</Link></li>

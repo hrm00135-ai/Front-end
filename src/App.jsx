@@ -19,6 +19,7 @@ import EmployeeAttendance from "./pages/Employee/Attendance";
 import EmployeeLeaves from "./pages/Employee/Leaves";
 import EmployeeDocuments from "./pages/Employee/Documents";
 import EmployeeProfilePage from "./pages/Employee/Profile";
+import Payments from "./pages/Admin/Payments";
 
 
 function ProtectedRoute({ children, allowedRoles }) {
@@ -156,6 +157,8 @@ function App() {
             <EmployeeProfilePage />
           </ProtectedRoute>
         } />
+
+        <Route path="/admin/payments" element={<ProtectedRoute allowedRoles={["admin","super_admin"]}><Payments /></ProtectedRoute>} />
         
       </Routes>
     </BrowserRouter>
