@@ -20,6 +20,7 @@ import EmployeeLeaves from "./pages/Employee/Leaves";
 import EmployeeDocuments from "./pages/Employee/Documents";
 import EmployeeProfilePage from "./pages/Employee/Profile";
 import Payments from "./pages/Admin/Payments";
+import EmployeePayments from "./pages/Employee/Payments";
 
 
 function ProtectedRoute({ children, allowedRoles }) {
@@ -121,7 +122,6 @@ function App() {
           </ProtectedRoute>
         } />
 
-
         <Route path="/employee/tasks" element={
           <ProtectedRoute allowedRoles={["employee"]}>
             <EmployeeTasks />
@@ -152,8 +152,18 @@ function App() {
           </ProtectedRoute>
         } />
 
-        <Route path="/admin/payments" element={<ProtectedRoute allowedRoles={["admin","super_admin"]}><Payments /></ProtectedRoute>} />
-        
+        <Route path="/admin/payments" element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
+            <Payments />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/employee/payments" element={
+          <ProtectedRoute allowedRoles={["employee"]}>
+            <EmployeePayments />
+          </ProtectedRoute>
+        } />
+
       </Routes>
     </BrowserRouter>
     </ErrorBoundary>

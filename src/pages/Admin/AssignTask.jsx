@@ -1,11 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import Layout from "../../components/Layout";
 import TaskCard from "../../components/TaskCard";
 import TaskColumn from "../../components/TaskColumn";
 import { Plus, X, Send, Edit3, Save } from "lucide-react";
-import { apiCall, BASE_URL } from "../../utils/api";
+import { apiCall, uploadTaskFiles, BASE_URL } from "../../utils/api";
 import AdminTopBar from "../../components/AdminTopBar";
+
+const POLL_INTERVAL = 30000; // 30s auto-refresh
 
 // Image compression before upload
 const compressImage = (file) => {
@@ -205,6 +207,7 @@ const AssignTask = () => {
   // Admin attachment upload
   const [adminFiles, setAdminFiles] = useState([]);
   const [uploadingFiles, setUploadingFiles] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ percent: 0, message: "" });
 
   const [formData, setFormData] = useState({
     title: "",
@@ -234,6 +237,14 @@ const AssignTask = () => {
   useEffect(() => {
     fetchTasks();
     fetchEmployees();
+  }, []);
+
+  // ── Auto-refresh polling (every 30s) ──
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchTasks();
+    }, POLL_INTERVAL);
+    return () => clearInterval(interval);
   }, []);
 
   // Auto-open task detail if ?taskId=X is present (e.g. from a notification)
@@ -301,32 +312,28 @@ const AssignTask = () => {
     setUploadingFiles(false);
   };
 
-  // Upload attachments from admin detail modal
+  // Upload attachments from admin detail modal (robust)
   const handleAdminUpload = async () => {
     if (!adminFiles.length || !selectedTask) return;
     setUploadingFiles(true);
+    setUploadProgress({ percent: 0, message: "" });
     try {
-      const fd = new FormData();
-      for (const file of adminFiles) {
-        fd.append("files", file);
-      }
-      const res = await apiCall(`/tasks/${selectedTask}/attachments`, {
-        method: "POST",
-        body: fd,
+      const result = await uploadTaskFiles(selectedTask, adminFiles, (percent, message) => {
+        setUploadProgress({ percent, message });
       });
-      const data = await res.json();
-      if (data.status === "success") {
-        setSuccess(data.message || "Files uploaded");
+      if (result.success) {
+        setSuccess(result.message || "Files uploaded");
         setAdminFiles([]);
-        fetchTaskDetail(selectedTask); // refresh to show new attachments
+        fetchTaskDetail(selectedTask);
         setTimeout(() => setSuccess(""), 3000);
       } else {
-        setError(data.message || "Upload failed");
+        setError(result.message || "Upload failed");
       }
     } catch {
       setError("Upload failed");
     } finally {
       setUploadingFiles(false);
+      setUploadProgress({ percent: 0, message: "" });
     }
   };
 
@@ -1407,9 +1414,16 @@ const AssignTask = () => {
                           }}
                         >
                           {uploadingFiles
-                            ? "Uploading & Compressing..."
+                            ? uploadProgress.message || "Uploading..."
                             : `Upload ${adminFiles.length} file(s)`}
                         </button>
+                        {uploadingFiles && uploadProgress.percent > 0 && (
+                          <div style={{ marginTop: "6px" }}>
+                            <div style={{ height: 4, background: "#e2e8f0", borderRadius: 2, overflow: "hidden" }}>
+                              <div style={{ height: "100%", background: "#2563eb", width: `${uploadProgress.percent}%`, transition: "width 0.3s" }} />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
