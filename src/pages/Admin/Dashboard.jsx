@@ -6,7 +6,9 @@ import AdminTopBar from "../../components/AdminTopBar";
 
 function fmt(iso) {
   if (!iso) return "—";
-  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  // Backend stores UTC — append Z if missing so JS parses as UTC
+  const raw = iso.endsWith("Z") || iso.includes("+") ? iso : iso + "Z";
+  return new Date(raw).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
 const Dashboard = () => {
@@ -24,6 +26,8 @@ const Dashboard = () => {
   const [expandedEmp, setExpandedEmp]   = useState(null);
   const [expandedSection, setExpandedSection] = useState(null);
   const [empDetails, setEmpDetails]     = useState({});
+  const [showAdminList, setShowAdminList] = useState(false);
+  const [showEmpList, setShowEmpList]   = useState(false);
 
   useEffect(() => {
     const fetchAll = async () => {
@@ -122,11 +126,63 @@ const fetchSessions = async () => {
 
       {/* Stats Row 1 */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
-        <StatCard label="Total Employees"  value={stats?.employees?.total             || 0} color="#3b82f6" />
+        <div onClick={() => setShowEmpList(!showEmpList)} style={{ cursor: "pointer" }}>
+          <StatCard label="Total Employees" value={stats?.employees?.total || 0} color="#3b82f6" clickable />
+        </div>
         <StatCard label="Checked In Today" value={stats?.attendance_today?.checked_in || 0} color="#16a34a" />
         <StatCard label="Late Today"       value={stats?.attendance_today?.late        || 0} color="#ea580c" />
-        <StatCard label="On Leave"         value={stats?.attendance_today?.on_leave    || 0} color="#8b5cf6" />
+        {isSuperAdmin ? (
+          <div onClick={() => setShowAdminList(!showAdminList)} style={{ cursor: "pointer" }}>
+            <StatCard label="Total Admins" value={stats?.employees?.admins || 0} color="#8b5cf6" clickable />
+          </div>
+        ) : (
+          <StatCard label="On Leave" value={stats?.attendance_today?.on_leave || 0} color="#8b5cf6" />
+        )}
       </div>
+
+      {/* Expanded Employee List */}
+      {showEmpList && (
+        <div className="bg-white p-4 rounded-xl shadow mb-6" style={{ maxHeight: "300px", overflowY: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <h3 style={{ fontWeight: "600", fontSize: "15px" }}>Employees ({employees.filter(e => e.role === "employee").length})</h3>
+            <button onClick={() => setShowEmpList(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "18px", color: "#94a3b8" }}>×</button>
+          </div>
+          {employees.filter(e => e.role === "employee").map(emp => (
+            <div key={emp.id} onClick={() => navigate(`/admin/employees/${emp.id}`)} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 4px", borderBottom: "1px solid #f1f5f9", cursor: "pointer" }}>
+              <img
+                src={emp.photo_url ? `${BASE_URL}/${emp.photo_url}` : `https://ui-avatars.com/api/?name=${emp.first_name}+${emp.last_name}&background=3b82f6&color=fff&size=32`}
+                alt="" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: "600", fontSize: "13px" }}>{emp.first_name} {emp.last_name}</div>
+                <div style={{ fontSize: "11px", color: "#94a3b8" }}>{emp.employee_id} • {emp.designation || emp.department || "Employee"}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Expanded Admin List */}
+      {showAdminList && isSuperAdmin && (
+        <div className="bg-white p-4 rounded-xl shadow mb-6" style={{ maxHeight: "300px", overflowY: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+            <h3 style={{ fontWeight: "600", fontSize: "15px" }}>Admins ({employees.filter(e => e.role === "admin").length})</h3>
+            <button onClick={() => setShowAdminList(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "18px", color: "#94a3b8" }}>×</button>
+          </div>
+          {employees.filter(e => e.role === "admin").map(adm => (
+            <div key={adm.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 4px", borderBottom: "1px solid #f1f5f9" }}>
+              <img
+                src={adm.photo_url ? `${BASE_URL}/${adm.photo_url}` : `https://ui-avatars.com/api/?name=${adm.first_name}+${adm.last_name}&background=8b5cf6&color=fff&size=32`}
+                alt="" style={{ width: "32px", height: "32px", borderRadius: "50%", objectFit: "cover" }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: "600", fontSize: "13px" }}>{adm.first_name} {adm.last_name}</div>
+                <div style={{ fontSize: "11px", color: "#94a3b8" }}>{adm.employee_id} • {adm.designation || "Admin"}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Stats Row 2 */}
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-4 mb-6">
@@ -359,10 +415,11 @@ const SummaryChip = ({ label, value, color, bg }) => (
   </div>
 );
 
-const StatCard = ({ label, value, color }) => (
-  <div className="bg-white p-4 rounded-xl shadow">
+const StatCard = ({ label, value, color, clickable }) => (
+  <div className="bg-white p-4 rounded-xl shadow" style={{ position: "relative" }}>
     <p className="text-gray-500 text-sm">{label}</p>
     <h2 className="text-2xl font-bold" style={{ color }}>{value}</h2>
+    {clickable && <span style={{ position: "absolute", top: "8px", right: "10px", fontSize: "10px", color: "#94a3b8" }}>Click to view ▸</span>}
   </div>
 );
 

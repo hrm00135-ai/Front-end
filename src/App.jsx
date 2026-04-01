@@ -12,6 +12,7 @@ import MetalPrices from "./pages/Admin/MetalPrices";
 import Reports from "./pages/Admin/Reports";
 import PasswordResets from "./pages/Admin/PasswordResets";
 import SystemLogs from "./pages/Admin/SystemLogs";
+import LoginActivity from "./pages/Admin/LoginActivity";
 import ErrorBoundary from "./components/ErrorBoundary";
 import EmployeeTasks from "./pages/Employee/EmployeeTasks";
 import EmployeeAttendance from "./pages/Employee/Attendance";
@@ -110,6 +111,12 @@ function App() {
         <Route path="/admin/system-logs" element={
           <ProtectedRoute allowedRoles={["super_admin"]}>
             <SystemLogs />
+          </ProtectedRoute>
+        } />
+
+        <Route path="/admin/login-activity" element={
+          <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
+            <LoginActivity />
           </ProtectedRoute>
         } />
 

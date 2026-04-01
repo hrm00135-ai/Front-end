@@ -80,6 +80,12 @@ const EmployeeProfile = () => {
       const data = await res.json();
       if (data.status === "success") {
         setMsg({ text: "Photo updated!", type: "success" });
+        // Update localStorage so navbar/sidebar show new photo immediately
+        if (data.data?.photo_url) {
+          const storedUser = JSON.parse(localStorage.getItem("user") || "{}");
+          storedUser.photo_url = data.data.photo_url;
+          localStorage.setItem("user", JSON.stringify(storedUser));
+        }
         fetchProfile();
       } else {
         setMsg({ text: data.message || "Photo upload failed.", type: "error" });

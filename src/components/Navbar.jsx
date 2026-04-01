@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { getUser, logout, apiCall } from "../utils/api";
+import { getUser, logout, apiCall, BASE_URL } from "../utils/api";
 import { useNavigate } from "react-router-dom";
 
 // ── helpers ────────────────────────────────────────────────────────────────
@@ -464,12 +464,19 @@ const Navbar = () => {
         </div>
 
         {/* User Info */}
-        <div style={{ textAlign: "right", fontSize: "14px" }}>
-          <div style={{ fontWeight: "600" }}>
-            {user?.first_name} {user?.last_name}
-          </div>
-          <div style={{ color: "#64748b", fontSize: "12px" }}>
-            {user?.employee_id} • {user?.role?.replace("_", " ")}
+        <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+          <img
+            src={user?.photo_url ? `${BASE_URL}/${user.photo_url}` : `https://ui-avatars.com/api/?name=${user?.first_name || "U"}+${user?.last_name || ""}&background=3b82f6&color=fff&size=36`}
+            alt=""
+            style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "2px solid #e2e8f0" }}
+          />
+          <div style={{ textAlign: "right", fontSize: "14px" }}>
+            <div style={{ fontWeight: "600" }}>
+              {user?.first_name} {user?.last_name}
+            </div>
+            <div style={{ color: "#64748b", fontSize: "12px" }}>
+              {user?.employee_id} • {user?.role?.replace("_", " ")}
+            </div>
           </div>
         </div>
 

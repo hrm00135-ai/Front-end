@@ -148,6 +148,11 @@ const AssignTask = () => {
   // Track which Kanban columns have their "Older" section expanded
   const [expandedOlderCols, setExpandedOlderCols] = useState(new Set());
 
+  // Search & Filter
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterEmployee, setFilterEmployee] = useState("");
+  const [filterDate, setFilterDate] = useState("");
+
   const [searchParams, setSearchParams] = useSearchParams();
 
   useEffect(() => {
@@ -655,11 +660,63 @@ const AssignTask = () => {
         </div>
       )}
 
+      {/* Search & Filter Bar */}
+      <div className="bg-white p-4 rounded-xl shadow mb-6" style={{ display: "flex", gap: "12px", alignItems: "flex-end", flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: "180px" }}>
+          <label style={lbl}>Search tasks</label>
+          <input
+            type="text"
+            placeholder="Search by title, description, category..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            style={inp}
+          />
+        </div>
+        <div style={{ minWidth: "160px" }}>
+          <label style={lbl}>Employee</label>
+          <select value={filterEmployee} onChange={(e) => setFilterEmployee(e.target.value)} style={inp}>
+            <option value="">All Employees</option>
+            {employees.map((e) => (
+              <option key={e.id} value={e.id}>{e.first_name} {e.last_name}</option>
+            ))}
+          </select>
+        </div>
+        <div style={{ minWidth: "140px" }}>
+          <label style={lbl}>Due Date</label>
+          <input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            style={inp}
+          />
+        </div>
+        {(searchQuery || filterEmployee || filterDate) && (
+          <button
+            onClick={() => { setSearchQuery(""); setFilterEmployee(""); setFilterDate(""); }}
+            style={{ padding: "8px 14px", borderRadius: "6px", border: "1px solid #cbd5e1", fontSize: "13px", cursor: "pointer", background: "#f1f5f9", color: "#64748b", fontWeight: "600" }}
+          >
+            Clear
+          </button>
+        )}
+      </div>
+
       {/* Kanban Columns — date-grouped within each column */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         {COLUMNS.map((col) => {
+          const q = searchQuery.toLowerCase();
           const colTasks = tasks
             .filter((t) => t.status === col.key)
+            .filter((t) => {
+              if (q && !(
+                t.title?.toLowerCase().includes(q) ||
+                t.description?.toLowerCase().includes(q) ||
+                t.category?.toLowerCase().includes(q) ||
+                t.assignee_name?.toLowerCase().includes(q)
+              )) return false;
+              if (filterEmployee && String(t.assigned_to) !== filterEmployee) return false;
+              if (filterDate && t.due_date !== filterDate) return false;
+              return true;
+            })
             .sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
           const { today, thisWeek, older } = groupTasksByDate(colTasks);

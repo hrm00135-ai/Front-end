@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { getUser } from "../utils/api";
+import { getUser, BASE_URL } from "../utils/api";
 
 const Sidebar = () => {
   const user = getUser();
@@ -7,6 +7,10 @@ const Sidebar = () => {
   const role = user?.role;
   const isAdmin = role === "admin" || role === "super_admin";
   const isSuperAdmin = role === "super_admin";
+
+  const photoUrl = user?.photo_url
+    ? user.photo_url.startsWith("http") ? user.photo_url : `${BASE_URL}/${user.photo_url}`
+    : `https://ui-avatars.com/api/?name=${user?.first_name || "U"}+${user?.last_name || ""}&background=3b82f6&color=fff&size=40`;
 
   const linkStyle = (path) => ({
     color: location.pathname === path ? "#60a5fa" : "white",
@@ -30,9 +34,14 @@ const Sidebar = () => {
 
   return (
     <div style={{ width: "220px", minWidth: "220px", background: "#1e293b", color: "white", padding: "16px 12px", overflowY: "auto" }}>
-      <h2 style={{ fontSize: "16px", fontWeight: "700", padding: "0 12px 8px", borderBottom: "1px solid #334155", marginBottom: "8px" }}>
-        {isAdmin ? "Admin Panel" : "Employee Panel"}
-      </h2>
+      {/* User Avatar */}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "0 12px 12px", borderBottom: "1px solid #334155", marginBottom: "8px" }}>
+        <img src={photoUrl} alt="" style={{ width: "36px", height: "36px", borderRadius: "50%", objectFit: "cover", border: "2px solid #475569" }} />
+        <div>
+          <div style={{ fontSize: "14px", fontWeight: "700", lineHeight: "1.2" }}>{user?.first_name} {user?.last_name?.charAt(0)}.</div>
+          <div style={{ fontSize: "11px", color: "#94a3b8" }}>{isAdmin ? (isSuperAdmin ? "Super Admin" : "Admin") : "Employee"}</div>
+        </div>
+      </div>
 
       <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
         {isAdmin && (
