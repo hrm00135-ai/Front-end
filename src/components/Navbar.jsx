@@ -4,36 +4,71 @@ import { useNavigate } from "react-router-dom";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 
-const MOCK_NOTIFICATIONS = [
-  {
-    id: 1,
-    type: "task",
-    message: "New task assigned: Polish gold rings",
-    is_read: false,
-    created_at: new Date(Date.now() - 1000 * 60 * 5).toISOString(),
-  },
-  {
-    id: 2,
-    type: "leave",
-    message: "Your leave request has been approved",
-    is_read: false,
-    created_at: new Date(Date.now() - 1000 * 60 * 30).toISOString(),
-  },
-  {
-    id: 3,
-    type: "payroll",
-    message: "Your salary for March has been processed",
-    is_read: true,
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(),
-  },
-  {
-    id: 4,
-    type: "task",
-    message: "Task 'Engrave bracelet' marked as completed",
-    is_read: true,
-    created_at: new Date(Date.now() - 1000 * 60 * 60 * 5).toISOString(),
-  },
-];
+const STORAGE_KEY = "read_notification_ids";
+
+/** Persist read IDs in localStorage so they survive page refresh */
+function getLocalReadIds() {
+  try {
+    return new Set(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"));
+  } catch {
+    return new Set();
+  }
+}
+
+function saveLocalReadId(id) {
+  const ids = getLocalReadIds();
+  ids.add(id);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
+}
+
+function saveAllReadIds(notifications) {
+  const ids = getLocalReadIds();
+  notifications.forEach((n) => ids.add(n.id));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
+}
+
+/** Merge backend notifications with locally-persisted read state */
+function mergeReadState(notifications) {
+  const localReadIds = getLocalReadIds();
+  return notifications.map((n) => ({
+    ...n,
+    is_read: n.is_read || localReadIds.has(n.id),
+  }));
+}
+
+/** Return the correct base route based on notification type and user role */
+function getNotifRoute(type, role) {
+  const isAdmin = role === "admin" || role === "super_admin";
+  if (isAdmin) {
+    const adminMap = {
+      task: "/admin/assign-task",
+      leave: "/admin/leaves",
+      payroll: "/admin/payroll",
+      attendance: "/admin/attendance",
+    };
+    return adminMap[type] || null;
+  }
+  const employeeMap = {
+    task: "/employee/tasks",
+    leave: "/employee/leaves",
+    payroll: "/employee/payroll",
+    attendance: "/employee/attendance",
+  };
+  return employeeMap[type] || null;
+}
+
+/**
+ * Extract the task/entity ID from a notification.
+ * Backends typically attach task_id / related_id on the notification object.
+ */
+function extractRelatedId(notification) {
+  return (
+    notification.task_id ||
+    notification.related_id ||
+    notification.related_object_id ||
+    null
+  );
+}
 
 function timeAgo(isoString) {
   const diff = Math.floor((Date.now() - new Date(isoString)) / 1000);
@@ -69,9 +104,9 @@ const Navbar = () => {
     try {
       const res = await apiCall("/notifications");
       const data = await res.json();
-
       if (data.status === "success") {
-        setNotifications(data.data || []);
+        // Merge backend data with locally-persisted read state
+        setNotifications(mergeReadState(data.data || []));
       }
     } catch (err) {
       console.error("Failed to fetch notifications:", err);
@@ -79,22 +114,36 @@ const Navbar = () => {
   };
 
   const handleNotificationClick = async (n) => {
+    // 1. Optimistically update UI immediately (no waiting for API)
+    setNotifications((prev) =>
+      prev.map((item) =>
+        item.id === n.id ? { ...item, is_read: true } : item
+      )
+    );
+
+    // 2. Persist locally so read state survives page refresh
+    saveLocalReadId(n.id);
+
+    // 3. Close dropdown
+    setOpen(false);
+
+    // 4. Navigate to the relevant page, passing the related entity ID so
+    //    the page can auto-open the correct task / leave / etc.
+    const route = getNotifRoute(n.type, user?.role);
+    if (route) {
+      const relatedId = extractRelatedId(n);
+      const destination =
+        relatedId && n.type === "task"
+          ? `${route}?taskId=${relatedId}`
+          : route;
+      navigate(destination);
+    }
+
+    // 5. Tell backend in background (fire-and-forget)
     try {
-      await apiCall(`/notifications/${n.id}/read`, {
-        method: "PUT",
-      });
-
-      if (n.type === "task") {
-        navigate("/employee/tasks");
-      } else if (n.type === "leave") {
-        navigate("/employee/leaves");
-      } else if (n.type === "payroll") {
-        navigate("/employee/payroll");
-      }
-
-      setOpen(false);
+      await apiCall(`/notifications/${n.id}/read`, { method: "PUT" });
     } catch (err) {
-      console.error("Notification click failed:", err);
+      console.error("Failed to mark notification as read on server:", err);
     }
   };
 
@@ -117,26 +166,28 @@ const Navbar = () => {
 
   // ── mark all as read ──
   const markAllRead = async () => {
-    try {
-      await apiCall("/notifications/mark-all-read", {
-        method: "PUT",
-      });
+    // 1. Optimistically update UI immediately
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
 
-      // Refresh from backend (BEST way)
-      fetchNotifications();
+    // 2. Persist all IDs locally so refresh doesn't reset them
+    saveAllReadIds(notifications);
+
+    // 3. Tell backend in background (fire-and-forget)
+    try {
+      await apiCall("/notifications/mark-all-read", { method: "PUT" });
     } catch (err) {
-      console.error("Failed to mark notifications as read:", err);
+      console.error("Failed to mark all notifications as read on server:", err);
     }
   };
 
-  // ── mark single as read ──
+  // ── mark single as read (kept for legacy usage) ──
   const markRead = async (id) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+    );
+    saveLocalReadId(id);
     try {
-      await apiCall(`/notifications/${id}/read`, {
-        method: "PUT",
-      });
-
-      fetchNotifications(); // sync with backend
+      await apiCall(`/notifications/${id}/read`, { method: "PUT" });
     } catch (err) {
       console.error("Failed to mark notification as read:", err);
     }
@@ -320,6 +371,16 @@ const Navbar = () => {
                         cursor: "pointer",
                         background: n.is_read ? "white" : "#eff6ff",
                         transition: "background 0.15s",
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = n.is_read
+                          ? "#f8fafc"
+                          : "#dbeafe";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = n.is_read
+                          ? "white"
+                          : "#eff6ff";
                       }}
                     >
                       {/* Icon */}
