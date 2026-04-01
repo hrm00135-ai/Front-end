@@ -56,7 +56,7 @@ const Sidebar = () => {
             <li><Link to="/admin/leaves" style={linkStyle("/admin/leaves")}>Leaves</Link></li>
 
             <span style={sectionLabel("Finance")}>Finance</span>
-            <li><Link to="/admin/payroll" style={linkStyle("/admin/payroll")}>Payroll</Link></li>
+            {/* <li><Link to="/admin/payroll" style={linkStyle("/admin/payroll")}>Payroll</Link></li> */}
             <li><Link to="/admin/metals" style={linkStyle("/admin/metals")}>Metal Prices</Link></li>
             <li><Link to="/admin/payments" style={linkStyle("/admin/payments")}>Payments</Link></li>
 

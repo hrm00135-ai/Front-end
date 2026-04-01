@@ -355,9 +355,15 @@ const Payroll = () => {
                   <th style={th}>Notes</th>
                 </tr>
               </thead>
+
+
               <tbody>
-                {wages.length === 0 ? (
-                  <tr><td colSpan="6" style={{ padding: "30px", textAlign: "center", color: "#94a3b8" }}>No wage records</td></tr>
+                {!Array.isArray(wages) || wages.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" style={{ padding: "30px", textAlign: "center", color: "#94a3b8" }}>
+                      No wage records
+                    </td>
+                  </tr>
                 ) : wages.map(w => (
                   <tr key={w.id} style={{ borderTop: "1px solid #e2e8f0" }}>
                     <td style={td}>{w.date}</td>
@@ -365,7 +371,14 @@ const Payroll = () => {
                     <td style={td}>{w.overtime_hours || 0}h</td>
                     <td style={{ ...td, fontWeight: "600" }}>₹{w.total_earned || w.total_pay || "—"}</td>
                     <td style={td}>
-                      <span style={{ background: (w.is_paid || w.payment_status === "paid") ? "#dcfce7" : "#fef3c7", color: (w.is_paid || w.payment_status === "paid") ? "#16a34a" : "#d97706", padding: "2px 8px", borderRadius: "4px", fontSize: "11px", fontWeight: "600" }}>
+                      <span style={{
+                        background: (w.is_paid || w.payment_status === "paid") ? "#dcfce7" : "#fef3c7",
+                        color: (w.is_paid || w.payment_status === "paid") ? "#16a34a" : "#d97706",
+                        padding: "2px 8px",
+                        borderRadius: "4px",
+                        fontSize: "11px",
+                        fontWeight: "600"
+                      }}>
                         {(w.is_paid || w.payment_status === "paid") ? "Paid" : "Pending"}
                       </span>
                     </td>
@@ -373,6 +386,8 @@ const Payroll = () => {
                   </tr>
                 ))}
               </tbody>
+
+
             </table>
           </div>
         </>

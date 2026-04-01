@@ -85,12 +85,6 @@ function App() {
           </ProtectedRoute>
         } />
 
-        <Route path="/admin/payroll" element={
-          <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
-            <Payroll />
-          </ProtectedRoute>
-        } />
-
         <Route path="/admin/metals" element={
           <ProtectedRoute allowedRoles={["admin", "super_admin"]}>
             <MetalPrices />
