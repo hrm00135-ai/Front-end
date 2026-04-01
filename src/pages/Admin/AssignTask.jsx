@@ -7,6 +7,33 @@ import { Plus, X, Send, Edit3, Save } from "lucide-react";
 import { apiCall, BASE_URL } from "../../utils/api";
 import AdminTopBar from "../../components/AdminTopBar";
 
+// Image compression before upload
+const compressImage = (file) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+
+    img.onload = () => {
+      const maxWidth = 1600;
+      const scale = maxWidth / img.width;
+      canvas.width = maxWidth;
+      canvas.height = img.height * scale;
+
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          resolve(new File([blob], file.name, { type: "image/jpeg" }));
+        },
+        "image/jpeg",
+        0.7,
+      );
+    };
+
+    img.src = URL.createObjectURL(file);
+  });
+};
+
 // ── Date grouping helpers ──────────────────────────────────────────────────
 
 function isSameDay(d1, d2) {
@@ -19,11 +46,17 @@ function isSameDay(d1, d2) {
 
 function groupTasksByDate(tasks) {
   const now = new Date();
-  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfToday = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+  );
   const startOfWeek = new Date(startOfToday);
   startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay()); // Sunday
 
-  const today = [], thisWeek = [], older = [];
+  const today = [],
+    thisWeek = [],
+    older = [];
   for (const t of tasks) {
     const d = new Date(t.created_at || t.assigned_at || 0);
     if (isSameDay(d, now)) today.push(t);
@@ -35,22 +68,42 @@ function groupTasksByDate(tasks) {
 
 function DateGroupLabel({ label, count }) {
   return (
-    <div style={{
-      fontSize: "10px", fontWeight: "700", letterSpacing: "0.08em",
-      textTransform: "uppercase", color: "#94a3b8",
-      padding: "6px 4px 4px", marginTop: "4px",
-      borderTop: "1px solid #f1f5f9",
-      display: "flex", justifyContent: "space-between",
-    }}>
+    <div
+      style={{
+        fontSize: "10px",
+        fontWeight: "700",
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: "#94a3b8",
+        padding: "6px 4px 4px",
+        marginTop: "4px",
+        borderTop: "1px solid #f1f5f9",
+        display: "flex",
+        justifyContent: "space-between",
+      }}
+    >
       <span>{label}</span>
-      <span style={{ background: "#f1f5f9", borderRadius: "10px", padding: "1px 7px", color: "#64748b" }}>
+      <span
+        style={{
+          background: "#f1f5f9",
+          borderRadius: "10px",
+          padding: "1px 7px",
+          color: "#64748b",
+        }}
+      >
         {count}
       </span>
     </div>
   );
 }
 
-function OlderSection({ tasks, colKey, expandedCols, setExpandedCols, renderTask }) {
+function OlderSection({
+  tasks,
+  colKey,
+  expandedCols,
+  setExpandedCols,
+  renderTask,
+}) {
   const isOpen = expandedCols.has(colKey);
   return (
     <div>
@@ -64,20 +117,43 @@ function OlderSection({ tasks, colKey, expandedCols, setExpandedCols, renderTask
           });
         }}
         style={{
-          width: "100%", background: "none", border: "none", cursor: "pointer",
-          fontSize: "10px", fontWeight: "700", letterSpacing: "0.08em",
-          textTransform: "uppercase", color: "#94a3b8",
-          padding: "6px 4px 4px", marginTop: "4px",
+          width: "100%",
+          background: "none",
+          border: "none",
+          cursor: "pointer",
+          fontSize: "10px",
+          fontWeight: "700",
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          color: "#94a3b8",
+          padding: "6px 4px 4px",
+          marginTop: "4px",
           borderTop: "1px solid #f1f5f9",
-          display: "flex", justifyContent: "space-between", alignItems: "center",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
         }}
       >
         <span>Older</span>
         <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-          <span style={{ background: "#f1f5f9", borderRadius: "10px", padding: "1px 7px", color: "#64748b" }}>
+          <span
+            style={{
+              background: "#f1f5f9",
+              borderRadius: "10px",
+              padding: "1px 7px",
+              color: "#64748b",
+            }}
+          >
             {tasks.length}
           </span>
-          <span style={{ fontSize: "14px", transition: "transform 0.2s", display: "inline-block", transform: isOpen ? "rotate(180deg)" : "rotate(0deg)" }}>
+          <span
+            style={{
+              fontSize: "14px",
+              transition: "transform 0.2s",
+              display: "inline-block",
+              transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          >
             ▾
           </span>
         </span>
@@ -258,53 +334,64 @@ const AssignTask = () => {
   const handleAddTask = async () => {
     setError("");
     setSuccess("");
-  
+
     if (!formData.title || !formData.assigned_to) {
       setError("Title and assigned employee are required");
       return;
     }
-  
+
     setSaving(true);
-  
+
     try {
       const data = new FormData();
-    
+
       data.append("title", formData.title);
       data.append("description", formData.description);
       data.append("assigned_to", parseInt(formData.assigned_to));
       data.append("priority", formData.priority);
       data.append("due_date", formData.due_date);
       data.append("category", formData.category);
-    
+
       if (formData.estimated_hours)
         data.append("estimated_hours", parseFloat(formData.estimated_hours));
-    
+
       if (formData.quantity)
         data.append("quantity", parseInt(formData.quantity));
-    
+
       if (formData.weight_grams)
         data.append("weight_grams", parseFloat(formData.weight_grams));
-    
+
       if (formData.payment_amount)
         data.append("payment_amount", parseFloat(formData.payment_amount));
-    
+
       data.append("admin_notes", formData.admin_notes);
-  
+
       if (formData.attachment && Array.isArray(formData.attachment)) {
         for (const file of formData.attachment) {
-          data.append("attachments", file);
+          if (file.type.startsWith("image")) {
+            const compressed = await compressImage(file);
+            data.append("attachments", compressed);
+          } else {
+            data.append("attachments", file);
+          }
         }
       } else if (formData.attachment) {
-        data.append("attachment", formData.attachment);
+        const file = formData.attachment;
+        if (file.type.startsWith("image")) {
+          const compressed = await compressImage(file);
+          data.append("attachment", compressed);
+        } else {
+          data.append("attachment", file);
+        }
       }
-    
+
       const res = await apiCall("/tasks/", {
         method: "POST",
-        body: data,   // IMPORTANT
+        body: data, // IMPORTANT
       });
-    
+
       const result = await res.json();
-    
+
       if (result.status === "success") {
         setSuccess("Task created!");
         setFormData({
@@ -640,9 +727,18 @@ const AssignTask = () => {
                 className="border rounded-lg p-2 w-full"
               />
               {formData.attachment && formData.attachment.length > 0 && (
-                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "6px" }}>
+                <div
+                  style={{
+                    fontSize: "12px",
+                    color: "#64748b",
+                    marginTop: "6px",
+                  }}
+                >
                   {formData.attachment.map((f, i) => (
-                    <span key={i}>{f.name}{i < formData.attachment.length - 1 ? ", " : ""}</span>
+                    <span key={i}>
+                      {f.name}
+                      {i < formData.attachment.length - 1 ? ", " : ""}
+                    </span>
                   ))}
                 </div>
               )}
@@ -727,7 +823,14 @@ const AssignTask = () => {
               title={`${col.title} (${colTasks.length})`}
             >
               {colTasks.length === 0 && (
-                <p style={{ fontSize: "12px", color: "#94a3b8", textAlign: "center", padding: "20px 0" }}>
+                <p
+                  style={{
+                    fontSize: "12px",
+                    color: "#94a3b8",
+                    textAlign: "center",
+                    padding: "20px 0",
+                  }}
+                >
                   No tasks
                 </p>
               )}
@@ -1167,68 +1270,145 @@ const AssignTask = () => {
                   )}
 
                   {/* ── ATTACHMENTS (images + videos) — admin review ── */}
-                  {taskDetail.attachments && taskDetail.attachments.length > 0 && (
-                    <div style={{ marginBottom: "20px" }}>
-                      <h4 style={{ fontWeight: "600", fontSize: "15px", marginBottom: "12px" }}>
-                        📎 Attachments ({taskDetail.attachments.length})
-                      </h4>
-                      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px" }}>
-                        {taskDetail.attachments.map((att) => {
-                          const url = att.file_url?.startsWith("http")
-                            ? att.file_url
-                            : `${BASE_URL}/${att.file_url}`;
-                          return (
-                            <div key={att.id} style={{ borderRadius: "8px", overflow: "hidden", border: "1px solid #e2e8f0" }}>
-                              {att.file_type === "video" ? (
-                                <video controls style={{ width: "100%", maxHeight: "180px", objectFit: "cover", display: "block" }}>
-                                  <source src={url} />
-                                </video>
-                              ) : (
-                                <img
-                                  src={url}
-                                  alt={att.original_name || "attachment"}
-                                  style={{ width: "100%", maxHeight: "180px", objectFit: "cover", display: "block", cursor: "pointer" }}
-                                  onClick={() => window.open(url, "_blank")}
-                                />
-                              )}
-                              <div style={{ padding: "4px 8px", fontSize: "11px", color: "#94a3b8", background: "#f8fafc" }}>
-                                {att.user_role === "employee" ? "👷 Employee" : "👔 Admin"} • {att.original_name || ""}
+                  {taskDetail.attachments &&
+                    taskDetail.attachments.length > 0 && (
+                      <div style={{ marginBottom: "20px" }}>
+                        <h4
+                          style={{
+                            fontWeight: "600",
+                            fontSize: "15px",
+                            marginBottom: "12px",
+                          }}
+                        >
+                          📎 Attachments ({taskDetail.attachments.length})
+                        </h4>
+                        <div
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "1fr 1fr 1fr",
+                            gap: "8px",
+                          }}
+                        >
+                          {taskDetail.attachments.map((att) => {
+                            const url = att.file_url?.startsWith("http")
+                              ? att.file_url
+                              : `${BASE_URL}/${att.file_url}`;
+                            return (
+                              <div
+                                key={att.id}
+                                style={{
+                                  borderRadius: "8px",
+                                  overflow: "hidden",
+                                  border: "1px solid #e2e8f0",
+                                }}
+                              >
+                                {att.file_type === "video" ? (
+                                  <video
+                                    controls
+                                    style={{
+                                      width: "100%",
+                                      maxHeight: "180px",
+                                      objectFit: "cover",
+                                      display: "block",
+                                    }}
+                                  >
+                                    <source src={url} />
+                                  </video>
+                                ) : (
+                                  <img
+                                    src={url}
+                                    alt={att.original_name || "attachment"}
+                                    style={{
+                                      width: "100%",
+                                      maxHeight: "180px",
+                                      objectFit: "cover",
+                                      display: "block",
+                                      cursor: "pointer",
+                                    }}
+                                    onClick={() => window.open(url, "_blank")}
+                                  />
+                                )}
+                                <div
+                                  style={{
+                                    padding: "4px 8px",
+                                    fontSize: "11px",
+                                    color: "#94a3b8",
+                                    background: "#f8fafc",
+                                  }}
+                                >
+                                  {att.user_role === "employee"
+                                    ? "👷 Employee"
+                                    : "👔 Admin"}{" "}
+                                  • {att.original_name || ""}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  )}
+                    )}
 
                   {/* ── Admin Upload Attachments ── */}
-                  <div style={{ marginBottom: "16px", padding: "12px", background: "#f8fafc", borderRadius: "8px", border: "1px dashed #cbd5e1" }}>
-                    <p style={{ fontSize: "13px", fontWeight: "600", marginBottom: "8px", color: "#475569" }}>📎 Upload Images / Videos</p>
+                  <div
+                    style={{
+                      marginBottom: "16px",
+                      padding: "12px",
+                      background: "#f8fafc",
+                      borderRadius: "8px",
+                      border: "1px dashed #cbd5e1",
+                    }}
+                  >
+                    <p
+                      style={{
+                        fontSize: "13px",
+                        fontWeight: "600",
+                        marginBottom: "8px",
+                        color: "#475569",
+                      }}
+                    >
+                      📎 Upload Images / Videos
+                    </p>
                     <input
                       type="file"
                       accept="image/*,video/*"
                       multiple
                       onChange={(e) => setAdminFiles([...e.target.files])}
-                      style={{ marginBottom: "8px", width: "100%", fontSize: "13px" }}
+                      style={{
+                        marginBottom: "8px",
+                        width: "100%",
+                        fontSize: "13px",
+                      }}
                     />
                     {adminFiles.length > 0 && (
                       <div style={{ marginBottom: "8px" }}>
                         {adminFiles.map((f, i) => (
-                          <div key={i} style={{ fontSize: "12px", color: "#64748b" }}>
-                            {f.type?.startsWith("video") ? "🎬" : "🖼"} {f.name} ({(f.size / 1024).toFixed(0)} KB)
+                          <div
+                            key={i}
+                            style={{ fontSize: "12px", color: "#64748b" }}
+                          >
+                            {f.type?.startsWith("video") ? "🎬" : "🖼"} {f.name}{" "}
+                            ({(f.size / 1024).toFixed(0)} KB)
                           </div>
                         ))}
                         <button
                           onClick={handleAdminUpload}
                           disabled={uploadingFiles}
                           style={{
-                            marginTop: "8px", background: "#2563eb", color: "white",
-                            padding: "8px 20px", borderRadius: "6px", border: "none",
-                            cursor: "pointer", fontWeight: "600", fontSize: "13px",
+                            marginTop: "8px",
+                            background: "#2563eb",
+                            color: "white",
+                            padding: "8px 20px",
+                            borderRadius: "6px",
+                            border: "none",
+                            cursor: "pointer",
+                            fontWeight: "600",
+                            fontSize: "13px",
                             opacity: uploadingFiles ? 0.6 : 1,
                           }}
                         >
-                          {uploadingFiles ? "Uploading & Compressing..." : `Upload ${adminFiles.length} file(s)`}
+                          {uploadingFiles
+                            ? "Uploading & Compressing..."
+                            : `Upload ${adminFiles.length} file(s)`}
                         </button>
                       </div>
                     )}
