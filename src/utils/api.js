@@ -1,6 +1,6 @@
 // When running via Vite dev server, use relative /api path so Vite proxy forwards to :5000
 // This avoids CORS issues entirely
-export const API_BASE = "/api";
+export const API_BASE = "https://back-end-i0s3.onrender.com/api";
 export const BASE_URL = "";
 
 export async function apiCall(endpoint, options = {}) {
